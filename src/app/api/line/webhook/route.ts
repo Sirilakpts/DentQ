@@ -1,0 +1,409 @@
+import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
+import { prisma } from "@/lib/prisma";
+import { replyMessage } from "@/lib/lineApi";
+import { buildEmergencySosCard } from "@/lib/line";
+import {
+  getBookingByIdFromSheet,
+  confirmBookingAttendanceInSheet,
+} from "@/lib/google-sheets";
+import { isDemoMode } from "@/lib/demo-data";
+
+export const dynamic = "force-dynamic";
+
+/**
+ * ฟังก์ชันตรวจสอบความถูกต้องของ x-line-signature ด้วย HMAC-SHA256
+ * เพื่อป้องกันการปลอมแปลง Request จากภายนอก
+ */
+function verifyLineSignature(
+  rawBody: string,
+  signature: string | null,
+  channelSecret: string
+): boolean {
+  if (!signature || !channelSecret) return false;
+  const hash = crypto
+    .createHmac("sha256", channelSecret)
+    .update(rawBody)
+    .digest("base64");
+  return hash === signature;
+}
+
+/**
+ * สกัดเบอร์โทรศัพท์จากข้อความหรือ vCard (เช่น 0812345678, 081-234-5678, +66812345678)
+ */
+function extractPhoneNumber(text: string): string | null {
+  if (!text) return null;
+  const match = text.match(
+    /(?:TEL.*?:|\b)(0[689]\d{1}[- ]?\d{3}[- ]?\d{4}|\+66[689]\d{8})\b/i
+  );
+  if (match && match[1]) {
+    const cleaned = match[1].replace(/\D/g, "");
+    if (cleaned.startsWith("66") && cleaned.length === 11) {
+      return "0" + cleaned.slice(2);
+    }
+    return cleaned;
+  }
+  return null;
+}
+
+/**
+ * Step 3: LINE Webhook Endpoint (POST)
+ * รับและประมวลผล Events จาก LINE Platform แบบ 2-Way Interaction
+ * **กฎเหล็ก:** ต้อง Return 200 OK เสมอในทุกกรณี เพื่อป้องกัน LINE แบนหรือปิด Webhook
+ */
+export async function POST(req: NextRequest) {
+  if (isDemoMode()) {
+    return NextResponse.json(
+      { message: "LINE Webhook received (Demo Mode - no-op)", isDemo: true },
+      { status: 200 }
+    );
+  }
+
+  try {
+    const rawBody = await req.text();
+    const signature = req.headers.get("x-line-signature");
+    const channelSecret = process.env.LINE_CHANNEL_SECRET;
+
+    // 1. ตรวจสอบความถูกต้องของ Signature (Security Verification)
+    if (!channelSecret) {
+      console.warn(
+        "[LINE Webhook Security] LINE_CHANNEL_SECRET not set in .env. Request rejected."
+      );
+      return NextResponse.json(
+        { status: "ignored", reason: "missing_secret", error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    const isValid = verifyLineSignature(rawBody, signature, channelSecret);
+    if (!isValid) {
+      console.warn(
+        "[LINE Webhook Security] Invalid x-line-signature. Request rejected."
+      );
+      return NextResponse.json(
+        { status: "ignored", reason: "invalid_signature", error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    // แปลงข้อมูล JSON Payload
+    let payload: any;
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json(
+        { status: "ignored", reason: "invalid_json" },
+        { status: 200 }
+      );
+    }
+
+    const events: any[] = payload.events || [];
+
+    // 2. ประมวลผล Events ด้วยโครงสร้าง Switch-Case
+    for (const event of events) {
+      const lineUserId = event.source?.userId;
+      const replyToken = event.replyToken;
+
+      switch (event.type) {
+        // ---------------------------------------------------------
+        // Case 1: Event ประเภท Message (ข้อความ, รูปภาพ, ตำแหน่ง, ข้อมูลติดต่อ)
+        // ---------------------------------------------------------
+        case "message": {
+          const message = event.message;
+          if (!message) break;
+
+          switch (message.type) {
+            // 1.1 ข้อความตัวอักษร (Text Message)
+            case "text": {
+              const text = (message.text || "").trim();
+
+              // คำสั่งขอความช่วยเหลือฉุกเฉิน (SOS / ฉุกเฉิน)
+              if (/^(sos|ฉุกเฉิน|ปวดฟันด่วน|ช่วยด้วย)$/i.test(text)) {
+                if (replyToken) {
+                  const sosCard = buildEmergencySosCard();
+                  await replyMessage(replyToken, [sosCard]);
+                }
+              } else {
+                // ตรวจสอบว่าผู้ใช้พิมพ์เบอร์โทรศัพท์เข้ามาหรือไม่
+                const extractedPhone = extractPhoneNumber(text);
+                if (extractedPhone && lineUserId) {
+                  const pendingCase = await prisma.emergencyCase.findFirst({
+                    where: { lineUserId, status: "PENDING" },
+                    orderBy: { createdAt: "desc" },
+                  });
+
+                  if (pendingCase) {
+                    await prisma.emergencyCase.update({
+                      where: { id: pendingCase.id },
+                      data: { phone: extractedPhone },
+                    });
+
+                    if (replyToken) {
+                      await replyMessage(replyToken, [
+                        `🚨 ได้รับเบอร์โทรศัพท์ติดต่อ (${extractedPhone}) แล้ว เจ้าหน้าที่จะรีบติดต่อกลับโดยด่วนที่สุดครับ`,
+                      ]);
+                    }
+                    break;
+                  }
+                }
+
+                // ตอบกลับข้อความของคนไข้ (Echo Message ตอบกลับทันที)
+                if (replyToken) {
+                  await replyMessage(replyToken, [
+                    `Q-Dentist ได้รับข้อความของคุณแล้ว: ${text}`,
+                  ]);
+                }
+              }
+              break;
+            }
+
+            // 1.2 ส่งพิกัดตำแหน่ง (Location Message)
+            case "location": {
+              if (!lineUserId) break;
+              const latitude = message.latitude;
+              const longitude = message.longitude;
+              const address = message.address || message.title || null;
+
+              const pendingCase = await prisma.emergencyCase.findFirst({
+                where: { lineUserId, status: "PENDING" },
+                orderBy: { createdAt: "desc" },
+              });
+
+              if (pendingCase) {
+                await prisma.emergencyCase.update({
+                  where: { id: pendingCase.id },
+                  data: { latitude, longitude, address },
+                });
+              } else {
+                await prisma.emergencyCase.create({
+                  data: {
+                    lineUserId,
+                    latitude,
+                    longitude,
+                    address,
+                    status: "PENDING",
+                  },
+                });
+              }
+
+              if (replyToken) {
+                await replyMessage(replyToken, [
+                  "🚨 คลินิกทันตกรรม Q-Dentist ได้รับพิกัดตำแหน่งของคุณเรียบร้อยแล้ว!\n\nเจ้าหน้าที่กำลังประสานงานทันตแพทย์ด่วน หากท่านยังไม่ได้ส่งเบอร์โทรศัพท์ กรุณากดปุ่มแชร์เบอร์โทรติดต่อกลับ หรือพิมพ์เบอร์โทรในแชทนี้ได้เลยครับ",
+                ]);
+              }
+              break;
+            }
+
+            // 1.3 ส่งข้อมูลติดต่อ (Contact Message - vCard)
+            case "contact": {
+              if (!lineUserId) break;
+              const vcard = message.vcard || "";
+              const title = message.title || "";
+              const phone =
+                extractPhoneNumber(vcard) || extractPhoneNumber(title) || title;
+
+              const pendingCase = await prisma.emergencyCase.findFirst({
+                where: { lineUserId, status: "PENDING" },
+                orderBy: { createdAt: "desc" },
+              });
+
+              if (pendingCase) {
+                await prisma.emergencyCase.update({
+                  where: { id: pendingCase.id },
+                  data: { phone },
+                });
+              } else {
+                await prisma.emergencyCase.create({
+                  data: {
+                    lineUserId,
+                    phone,
+                    status: "PENDING",
+                  },
+                });
+              }
+
+              if (replyToken) {
+                await replyMessage(replyToken, [
+                  `🚨 บันทึกเบอร์โทรศัพท์ติดต่อ (${phone}) เรียบร้อยแล้ว!\n\nเจ้าหน้าที่ทันตกรรมกำลังติดต่อกลับโดยด่วน กรุณารอรับสายครับ`,
+                ]);
+              }
+              break;
+            }
+
+            // 1.4 ส่งรูปถ่ายอาการ (Image Message)
+            case "image": {
+              if (replyToken) {
+                await replyMessage(replyToken, [
+                  "📸 คลินิกได้รับรูปถ่ายอาการเรียบร้อยแล้ว กำลังนำส่งให้ทันตแพทย์ประเมินเบื้องต้นครับ",
+                ]);
+              }
+              break;
+            }
+
+            default:
+              console.log(`[LINE Webhook] Unhandled message type: ${message.type}`);
+              break;
+          }
+          break;
+        }
+
+        // ---------------------------------------------------------
+        // Case 2: Event ประเภท Postback (Step 3: รับค่าการกดปุ่มบน Flex Message)
+        // ---------------------------------------------------------
+        case "postback": {
+          const postbackData = event.postback?.data || "";
+          console.log(`[LINE Webhook Postback] Received data from ${lineUserId}:`, postbackData);
+
+          try {
+            // แกะค่า action และ bookingId จาก postback data
+            const params = new URLSearchParams(postbackData);
+            const action = params.get("action");
+            const bookingId = params.get("bookingId");
+
+            if (action === "confirmBooking" && bookingId) {
+              const senderLineUserId = lineUserId ? String(lineUserId).trim() : null;
+              const bookingStorage = (process.env.BOOKING_STORAGE || "sqlite").toLowerCase();
+
+              if (bookingStorage === "sheets") {
+                // ==========================================
+                // Mode 1: Google Sheets Mode
+                // ==========================================
+                const booking = await getBookingByIdFromSheet(bookingId);
+
+                // ตรวจสอบสิทธิ์: ต้องพบคิว, คิวต้องมี lineUserId, และต้องตรงกับผู้ส่ง event
+                if (
+                  !booking ||
+                  !booking.lineUserId ||
+                  !senderLineUserId ||
+                  booking.lineUserId.trim() !== senderLineUserId
+                ) {
+                  console.warn(
+                    `[LINE Webhook Security] Unauthorized confirmBooking in Sheets mode: booking '${bookingId}', booking lineUserId '${booking?.lineUserId || "none"}', sender '${senderLineUserId || "none"}'`
+                  );
+                  if (replyToken) {
+                    await replyMessage(replyToken, [
+                      "ขออภัยค่ะ ระบบไม่พบข้อมูลคิวหรือคิวนี้ได้รับการยืนยันแล้ว กรุณาติดต่อเจ้าหน้าที่คลินิกโดยตรง โทร. 02-999-8888",
+                    ]);
+                  }
+                  break;
+                }
+
+                // สิทธิ์ถูกต้อง: อัปเดตสถานะ Col F (CONFIRMED) และ Col K (ATTENDANCE_CONFIRMED)
+                const updateRes = await confirmBookingAttendanceInSheet(booking.bookingId);
+                if (!updateRes.success) {
+                  throw new Error(updateRes.error || "Failed to update Google Sheets");
+                }
+
+                console.log(
+                  `[LINE Webhook Postback Sheets] คิว ${booking.bookingId} ยืนยันสำเร็จโดยคนไข้ ${senderLineUserId}`
+                );
+
+                if (replyToken) {
+                  await replyMessage(replyToken, [
+                    `ขอบคุณค่ะ ยืนยันคิวหมายเลข ${booking.bookingId} เรียบร้อยแล้ว แอดมินรอพบคุณอยู่ที่คลินิกนะคะ`,
+                  ]);
+                }
+              } else {
+                // ==========================================
+                // Mode 2: SQLite Mode (Default)
+                // ==========================================
+                const booking = await prisma.booking.findFirst({
+                  where: {
+                    OR: [{ id: bookingId }, { queueNumber: bookingId }],
+                  },
+                  include: { service: true },
+                });
+
+                // ตรวจสอบสิทธิ์: ต้องพบคิว, คิวต้องมี lineUserId, และต้องตรงกับผู้ส่ง event
+                if (
+                  !booking ||
+                  !booking.lineUserId ||
+                  !senderLineUserId ||
+                  booking.lineUserId.trim() !== senderLineUserId
+                ) {
+                  console.warn(
+                    `[LINE Webhook Security] Unauthorized confirmBooking in SQLite mode: booking '${bookingId}', booking lineUserId '${booking?.lineUserId || "none"}', sender '${senderLineUserId || "none"}'`
+                  );
+                  if (replyToken) {
+                    await replyMessage(replyToken, [
+                      "ขออภัยค่ะ ระบบไม่พบข้อมูลคิวหรือคิวนี้ได้รับการยืนยันแล้ว กรุณาติดต่อเจ้าหน้าที่คลินิกโดยตรง โทร. 02-999-8888",
+                    ]);
+                  }
+                  break;
+                }
+
+                // สิทธิ์ถูกต้อง: อัปเดตสถานะคิวในฐานข้อมูลผ่าน Prisma
+                const updated = await prisma.booking.update({
+                  where: { id: booking.id },
+                  data: {
+                    status: "CONFIRMED",
+                    reminderStatus: "ATTENDANCE_CONFIRMED",
+                  },
+                  include: { service: true },
+                });
+
+                console.log(
+                  `[LINE Webhook Postback SQLite] คิว ${updated.queueNumber} (${booking.id}) ยืนยันสำเร็จโดยคนไข้ ${senderLineUserId}`
+                );
+
+                if (replyToken) {
+                  const targetRef = updated.queueNumber || booking.id;
+                  await replyMessage(replyToken, [
+                    `ขอบคุณค่ะ ยืนยันคิวหมายเลข ${targetRef} เรียบร้อยแล้ว แอดมินรอพบคุณอยู่ที่คลินิกนะคะ`,
+                  ]);
+                }
+              }
+            } else {
+              console.log(`[LINE Webhook Postback] Unhandled postback action: ${action}`);
+            }
+          } catch (postbackErr: any) {
+            console.error("[LINE Webhook Postback Error]:", postbackErr.message || postbackErr);
+            if (replyToken) {
+              await replyMessage(replyToken, [
+                "ขออภัยค่ะ ระบบไม่พบข้อมูลคิวหรือคิวนี้ได้รับการยืนยันแล้ว กรุณาติดต่อเจ้าหน้าที่คลินิกโดยตรง โทร. 02-999-8888",
+              ]);
+            }
+          }
+          break;
+        }
+
+        // ---------------------------------------------------------
+        // Case 3: ผู้ใช้กดเพิ่มเพื่อน (Follow Event)
+        // ---------------------------------------------------------
+        case "follow": {
+          if (replyToken) {
+            await replyMessage(replyToken, [
+              "สวัสดีครับ ยินดีต้อนรับสู่ คลินิกทันตกรรม Q-Dentist! 🦷\n\nท่านสามารถจองคิวทำฟันล่วงหน้าผ่านระบบ หรือหากเกิดเหตุฉุกเฉิน (เช่น ปวดฟันรุนแรง/อุบัติเหตุฟันหัก) สามารถพิมพ์ 'ฉุกเฉิน' หรือ 'SOS' เพื่อขอรับความช่วยเหลือด่วนได้ทันทีครับ",
+            ]);
+          }
+          break;
+        }
+
+        default:
+          console.log(`[LINE Webhook] Unhandled event type: ${event.type}`);
+          break;
+      }
+    }
+
+    // คืนค่า 200 OK ตามมาตรฐาน LINE Webhook เสมอ
+    return NextResponse.json({ status: "success", received: events.length }, { status: 200 });
+  } catch (err: any) {
+    console.error("[LINE Webhook Error]:", err.message || err);
+    // Safe Mode: คืนค่า 200 OK เสมอ แม้มี Error ภายใน เพื่อไม่ให้ LINE ปิด Webhook
+    return NextResponse.json({ status: "error_handled" }, { status: 200 });
+  }
+}
+
+/**
+ * GET: ตรวจสอบสถานะ Webhook (สำหรับเบราว์เซอร์ และปุ่ม Verify ใน LINE Console)
+ */
+export async function GET() {
+  return NextResponse.json(
+    {
+      status: "active",
+      service: "Q-Dentist LINE Webhook Endpoint",
+      method: "POST is ready to accept events",
+    },
+    { status: 200 }
+  );
+}

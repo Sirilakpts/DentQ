@@ -1,0 +1,193 @@
+﻿import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+// Thai Month Names
+export const THAI_MONTHS = [
+  "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+  "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+];
+
+export const THAI_MONTHS_SHORT = [
+  "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
+  "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."
+];
+
+export const THAI_DAYS = [
+  "อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"
+];
+
+// Format date to Thai Buddhist Era (พ.ศ.)
+export function formatThaiDate(dateStr: string, options: { short?: boolean; includeDay?: boolean } = {}): string {
+  try {
+    const parts = dateStr.split("-");
+    if (parts.length !== 3) return dateStr;
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    
+    const d = new Date(year, month, day);
+    const buddhistYear = year + 543;
+    const monthName = options.short ? THAI_MONTHS_SHORT[month] : THAI_MONTHS[month];
+    
+    if (options.includeDay) {
+      const dayName = THAI_DAYS[d.getDay()];
+      return `วัน${dayName}ที่ ${day} ${monthName} ${buddhistYear}`;
+    }
+    
+    return `${day} ${monthName} ${buddhistYear}`;
+  } catch {
+    return dateStr;
+  }
+}
+
+// Mask Phone Number for PDPA (081-xxx-1234)
+export function maskPhoneNumber(phone: string): string {
+  const cleaned = phone.replace(/\D/g, "");
+  if (cleaned.length === 10) {
+    return `${cleaned.slice(0, 3)}-xxx-${cleaned.slice(7)}`;
+  }
+  return phone;
+}
+
+// Format Phone Number (081-234-5678)
+export function formatPhoneNumber(phone: string): string {
+  const cleaned = phone.replace(/\D/g, "");
+  if (cleaned.length === 10) {
+    return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+  }
+  return phone;
+}
+
+// Mask National ID / HN for PDPA (e.g. 1-1234-xxxxx-90-1 or HN-***567)
+export function maskNationalIdOrHn(val: string): string {
+  if (!val) return "";
+  const cleaned = val.trim();
+  if (cleaned.toUpperCase().startsWith("HN")) {
+    if (cleaned.length > 5) {
+      return `HN-***${cleaned.slice(-3)}`;
+    }
+    return `HN-***`;
+  }
+  
+  // National ID 13 digits
+  const digits = cleaned.replace(/\D/g, "");
+  if (digits.length === 13) {
+    return `${digits[0]}-${digits.slice(1, 5)}-xxxxx-${digits.slice(10, 12)}-${digits[12]}`;
+  }
+  
+  if (cleaned.length > 4) {
+    return `${cleaned.slice(0, 2)}****${cleaned.slice(-2)}`;
+  }
+  return "***";
+}
+
+// Standard Available Dental Slots (Morning 09:00 - 12:00, Afternoon 13:00 - 16:00)
+export const STANDARD_SLOTS = [
+  // Morning
+  { time: "09:00", period: "MORNING" as const },
+  { time: "09:30", period: "MORNING" as const },
+  { time: "10:00", period: "MORNING" as const },
+  { time: "10:30", period: "MORNING" as const },
+  { time: "11:00", period: "MORNING" as const },
+  { time: "11:30", period: "MORNING" as const },
+  // Afternoon
+  { time: "13:00", period: "AFTERNOON" as const },
+  { time: "13:30", period: "AFTERNOON" as const },
+  { time: "14:00", period: "AFTERNOON" as const },
+  { time: "14:30", period: "AFTERNOON" as const },
+  { time: "15:00", period: "AFTERNOON" as const },
+  { time: "15:30", period: "AFTERNOON" as const },
+];
+
+// Helper to get allowed booking dates (min 1 day prior, max 7 days in advance)
+export function getBookableDateRange(currentDate = new Date()): { minDate: string; maxDate: string; availableDates: string[] } {
+  // Format as YYYY-MM-DD
+  const dates: string[] = [];
+  
+  // start tomorrow (1 day ahead)
+  for (let i = 1; i <= 7; i++) {
+    const target = new Date(currentDate);
+    target.setDate(target.getDate() + i);
+    const yyyy = target.getFullYear();
+    const mm = String(target.getMonth() + 1).padStart(2, "0");
+    const dd = String(target.getDate()).padStart(2, "0");
+    dates.push(`${yyyy}-${mm}-${dd}`);
+  }
+  
+  return {
+    minDate: dates[0],
+    maxDate: dates[dates.length - 1],
+    availableDates: dates,
+  };
+}
+export type BookingStatus =
+  | "PENDING"
+  | "CONFIRMED"
+  | "CHECKED_IN"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "CANCELLED"
+  | "REJECTED";
+
+export interface DentalService {
+  id: string;
+  nameTh: string;
+  nameEn: string;
+  durationMinutes: number;
+  priceMin: number;
+  priceMax: number;
+  priceDisplay: string;
+  description: string;
+  icon: string;
+  isActive: boolean;
+}
+
+export interface SlotAvailability {
+  time: string;
+  period: "MORNING" | "AFTERNOON";
+  status: "AVAILABLE" | "FULL" | "BLOCKED";
+  currentBookings: number;
+  maxCapacity: number;
+  blockedReason?: string | null;
+}
+
+export interface BookingRecord {
+  id: string;
+  queueNumber: string;
+  date: string;
+  time: string;
+  period: string;
+  serviceId: string;
+  service?: DentalService;
+  patientName: string;
+  phoneNumber: string;
+  nationalIdOrHn: string;
+  symptoms?: string | null;
+  isEmergency: boolean;
+  emergencySeverity?: string | null;
+  emergencyNotes?: string | null;
+  status: BookingStatus;
+  rejectReason?: string | null;
+  pdpaAccepted: boolean;
+  pdpaAcceptedAt: Date | string;
+  lineUserId?: string | null;
+  lineNotificationSent: boolean;
+  reminderSentAt?: Date | string | null;
+  reminderStatus?: string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface ClinicKPIs {
+  pendingCount: number;
+  confirmedTodayCount: number;
+  inProgressCount: number;
+  completedTodayCount: number;
+  emergencyCount: number;
+  totalToday: number;
+  procedureCount?: number;
+}

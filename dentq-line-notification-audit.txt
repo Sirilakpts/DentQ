@@ -1,0 +1,61 @@
+﻿
+  src\lib\line.ts:621:/**
+  src\lib\line.ts:622: * Dispatch LINE Flex Message:
+  src\lib\line.ts:623: * 1. If LINE_CHANNEL_ACCESS_TOKEN is set and recipient has lineUserId, sends actual HTTP request to LINE Messaging API.
+  src\lib\line.ts:624: * 2. In all cases, persists the message in NotificationLog for staff audit and UI preview.
+  src\lib\line.ts:625: */
+> src\lib\line.ts:626:export async function sendLineFlexNotification(params: {
+  src\lib\line.ts:627:  bookingId: string;
+  src\lib\line.ts:628:  type: "APPROVAL" | "REJECTION" | "ADVANCE_REMINDER" | "STATUS_UPDATE" | "EMERGENCY_ALERT";
+  src\lib\line.ts:629:  recipient: string;
+  src\lib\line.ts:630:  flexMessage: LineFlexMessage;
+  src\lib\line.ts:631:}) {
+  src\lib\line.ts:632:  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  src\lib\line.ts:633:  let status = "SIMULATED";
+  src\lib\line.ts:634:
+  src\lib\line.ts:635:  if (token && params.recipient && !params.recipient.startsWith("08") && !params.recipient.startsWith("09")) {
+  src\lib\line.ts:636:    try {
+  src\lib\line.ts:637:      const res = await fetch("https://api.line.me/v2/bot/message/push", {
+  src\lib\line.ts:638:        method: "POST",
+  src\lib\line.ts:639:        headers: {
+  src\lib\line.ts:640:          "Content-Type": "application/json",
+  src\lib\line.ts:641:          Authorization: `Bearer ${token}`,
+  src\lib\line.ts:642:        },
+  src\lib\line.ts:643:        body: JSON.stringify({
+  src\lib\line.ts:644:          to: params.recipient,
+  src\lib\line.ts:645:          messages: [params.flexMessage],
+  src\lib\line.ts:646:        }),
+  src\lib\line.ts:647:      });
+  src\lib\line.ts:648:
+  src\lib\line.ts:649:      if (res.ok) {
+  src\lib\line.ts:650:        status = "SUCCESS";
+  src\lib\line.ts:651:      } else {
+  src\lib\line.ts:652:        const errorData = await res.json().catch(() => ({}));
+  src\lib\line.ts:653:        console.warn("LINE Messaging API responded with error:", errorData);
+  src\lib\line.ts:654:        status = "FAILED";
+  src\lib\line.ts:655:      }
+  src\lib\line.ts:656:    } catch (err) {
+  src\lib\line.ts:657:      console.warn("Error sending LINE message:", err);
+  src\lib\line.ts:658:      status = "FAILED";
+  src\lib\line.ts:659:    }
+  src\lib\line.ts:660:  }
+  src\lib\line.ts:661:
+  src\lib\line.ts:662:  // Record in NotificationLog
+  src\lib\line.ts:663:  try {
+  src\lib\line.ts:664:    const log = await prisma.notificationLog.create({
+  src\lib\line.ts:665:      data: {
+  src\lib\line.ts:666:        bookingId: params.bookingId,
+  src\lib\line.ts:667:        type: params.type,
+  src\lib\line.ts:668:        recipient: params.recipient,
+  src\lib\line.ts:669:        flexMessagePayload: JSON.stringify(params.flexMessage),
+  src\lib\line.ts:670:        status: status,
+  src\lib\line.ts:671:      },
+  src\lib\line.ts:672:    });
+  src\lib\line.ts:673:    return { success: true, status, logId: log.id };
+  src\lib\line.ts:674:  } catch (err) {
+  src\lib\line.ts:675:    console.error("Failed to save NotificationLog:", err);
+  src\lib\line.ts:676:    return { success: false, status: "ERROR" };
+  src\lib\line.ts:677:  }
+  src\lib\line.ts:678:}
+
+

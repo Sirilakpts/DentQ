@@ -1,0 +1,47 @@
+﻿
+Path                                                LineNumber Line                                                                        
+----                                                ---------- ----                                                                        
+C:\DentQ\src\app\api\admin\emergency-cases\route.ts         11     const cases = await prisma.emergencyCase.findMany({                     
+C:\DentQ\src\app\api\admin\emergency-cases\route.ts         41     const updated = await prisma.emergencyCase.update({                     
+C:\DentQ\src\app\api\admin\kpis\route.ts                    28       prisma.booking.count({                                                
+C:\DentQ\src\app\api\admin\kpis\route.ts                    32       prisma.booking.count({                                                
+C:\DentQ\src\app\api\admin\kpis\route.ts                    39       prisma.booking.count({                                                
+C:\DentQ\src\app\api\admin\kpis\route.ts                    46       prisma.booking.count({                                                
+C:\DentQ\src\app\api\admin\kpis\route.ts                    53       prisma.booking.count({                                                
+C:\DentQ\src\app\api\admin\kpis\route.ts                    60       prisma.booking.count({                                                
+C:\DentQ\src\app\api\admin\kpis\route.ts                    66       prisma.booking.count({                                                
+C:\DentQ\src\app\api\bookings\[id]\status\route.ts          36     const booking = await prisma.booking.findUnique({                       
+C:\DentQ\src\app\api\bookings\[id]\status\route.ts          49     const updated = await prisma.booking.update({                           
+C:\DentQ\src\app\api\bookings\[id]\status\route.ts          80       await prisma.booking.update({                                         
+C:\DentQ\src\app\api\bookings\[id]\status\route.ts         102       await prisma.booking.update({                                         
+C:\DentQ\src\app\api\bookings\route.ts                      95     const bookings = await prisma.booking.findMany({                        
+C:\DentQ\src\app\api\bookings\route.ts                     125     const result = await prisma.$transaction(async (tx) => {                
+C:\DentQ\src\app\api\emergency\route.ts                     31     const latestEmg = await prisma.booking.findFirst({                      
+C:\DentQ\src\app\api\emergency\route.ts                     46     const emergencyBooking = await prisma.booking.create({                  
+C:\DentQ\src\app\api\line\webhook\route.ts                 115                   const pendingCase = await prisma.emergencyCase.findFirst({
+C:\DentQ\src\app\api\line\webhook\route.ts                 121                     await prisma.emergencyCase.update({                     
+C:\DentQ\src\app\api\line\webhook\route.ts                 152               const pendingCase = await prisma.emergencyCase.findFirst({    
+C:\DentQ\src\app\api\line\webhook\route.ts                 158                 await prisma.emergencyCase.update({                         
+C:\DentQ\src\app\api\line\webhook\route.ts                 163                 await prisma.emergencyCase.create({                         
+C:\DentQ\src\app\api\line\webhook\route.ts                 190               const pendingCase = await prisma.emergencyCase.findFirst({    
+C:\DentQ\src\app\api\line\webhook\route.ts                 196                 await prisma.emergencyCase.update({                         
+C:\DentQ\src\app\api\line\webhook\route.ts                 201                 await prisma.emergencyCase.create({                         
+C:\DentQ\src\app\api\line\webhook\route.ts                 250               const updated = await prisma.booking.update({                 
+C:\DentQ\src\app\api\notifications\route.ts                  8     const logs = await prisma.notificationLog.findMany({                    
+C:\DentQ\src\app\api\services\route.ts                       6     const services = await prisma.service.findMany({                        
+C:\DentQ\src\app\api\slots\toggle\route.ts                  18     const updated = await prisma.slotConfig.upsert({                        
+C:\DentQ\src\app\api\slots\route.ts                         21     const slotConfigs = await prisma.slotConfig.findMany({                  
+C:\DentQ\src\app\api\slots\route.ts                         28     const activeBookings = await prisma.booking.findMany({                  
+C:\DentQ\src\app\api\test-line\route.ts                     75       let targetBooking = await prisma.booking.findFirst({                  
+C:\DentQ\src\app\api\test-line\route.ts                     81         targetBooking = await prisma.booking.findFirst({                    
+C:\DentQ\src\app\api\test-line\route.ts                     94       const updated = await prisma.booking.update({                         
+C:\DentQ\src\app\api\test-line\route.ts                    116     const latestBooking = await prisma.booking.findFirst({                  
+C:\DentQ\src\app\api\tracking\action\route.ts               16     const booking = await prisma.booking.findUnique({                       
+C:\DentQ\src\app\api\tracking\action\route.ts               38     const updated = await prisma.booking.update({                           
+C:\DentQ\src\lib\cron.ts                                    21   const eligibleBookings = await prisma.booking.findMany({                  
+C:\DentQ\src\lib\cron.ts                                    58     await prisma.booking.update({                                           
+C:\DentQ\src\lib\line.ts                                   664     const log = await prisma.notificationLog.create({                       
+C:\DentQ\src\lib\prisma.ts                                   8   globalForPrisma.prisma ??                                                 
+C:\DentQ\src\lib\prisma.ts                                  13 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma; 
+
+

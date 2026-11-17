@@ -1,0 +1,270 @@
+﻿import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { z } from "zod";
+
+const bookingSchema = z.object({
+  serviceId: z.string().min(1, "กรุณาเลือกบริการทันตกรรม"),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ไม่ถูกต้อง (YYYY-MM-DD)"),
+  time: z.string().regex(/^\d{2}:\d{2}$/, "รูปแบบเวลาไม่ถูกต้อง (HH:mm)"),
+  period: z.enum(["MORNING", "AFTERNOON"]).optional(),
+  patientName: z.string().min(2, "กรุณากรอกชื่อ-นามสกุลให้ถูกต้อง"),
+  phoneNumber: z.string().regex(/^0[689]\d{8}$/, "กรุณากรอกเบอร์โทรศัพท์มือถือ 10 หลัก (เช่น 0812345678)"),
+  nationalIdOrHn: z.string().min(4, "กรุณากรอกเลขบัตรประชาชน 13 หลัก หรือเลขประจำตัวผู้ป่วย (HN)"),
+  symptoms: z.string().optional().nullable(),
+  pdpaAccepted: z.literal(true, {
+    errorMap: () => ({ message: "ท่านต้องยินยอมเงื่อนไข PDPA ก่อนดำเนินการจองคิว" }),
+  }),
+  lineUserId: z.string().optional().nullable(),
+});
+
+export const dynamic = "force-dynamic";
+
+/**
+ * ข้อความปฏิเสธเมื่อโควตาหัตถการเต็ม 6 คิว/วัน
+ */
+const PROCEDURE_QUOTA_EXCEEDED_MESSAGE =
+  "ขออภัย คิวสำหรับทำหัตถการในวันที่ท่านเลือกเต็มแล้ว กรุณาเลือกวันอื่น หรือจองคิวตรวจฟันเบื้องต้น";
+
+/**
+ * ฟังก์ชันตรวจสอบว่าบริการทันตกรรมจัดเป็นหัตถการ (ขูดหินปูน, อุดฟัน, ถอนฟัน) ที่ต้องจำกัดโควตาหรือไม่
+ * - นับรวม: "ขูดหินปูน", "อุดฟัน", "ถอนฟัน"
+ * - ไม่นับรวม: "ตรวจฟัน/ปรึกษา" (จองได้ตลอด)
+ */
+function isProcedureQuotaService(service: {
+  id?: string;
+  nameTh?: string;
+  nameEn?: string;
+} | null): boolean {
+  if (!service) return false;
+  const nameTh = service.nameTh || "";
+  const nameEn = (service.nameEn || "").toLowerCase();
+  const id = (service.id || "").toLowerCase();
+
+  // ตรวจสอบว่าตรงกับบริการหัตถการ ขูดหินปูน / อุดฟัน / ถอนฟัน หรือไม่
+  const matchesProcedure =
+    nameTh.includes("ขูด") ||
+    nameTh.includes("อุด") ||
+    nameTh.includes("ถอน") ||
+    nameEn.includes("scaling") ||
+    nameEn.includes("filling") ||
+    nameEn.includes("extraction") ||
+    id.includes("scaling") ||
+    id.includes("filling") ||
+    id.includes("extraction");
+
+  // ข้อยกเว้น: บริการ "ตรวจฟัน" หรือ "ปรึกษา" จองได้ตลอด ไม่นับรวมในโควตานี้
+  const isConsultation =
+    nameTh.includes("ตรวจ") ||
+    nameTh.includes("ปรึกษา") ||
+    nameEn.includes("consult") ||
+    nameEn.includes("check") ||
+    nameEn.includes("exam");
+
+  return matchesProcedure && !isConsultation;
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const phone = searchParams.get("phone");
+    const queueNumber = searchParams.get("queueNumber");
+    const date = searchParams.get("date");
+    const status = searchParams.get("status");
+    const isEmergency = searchParams.get("isEmergency");
+
+    const where: Record<string, unknown> = {};
+
+    if (queueNumber) {
+      where.queueNumber = queueNumber.trim().toUpperCase();
+    }
+    if (phone) {
+      // Allow searching by exact or stripped digits
+      const digits = phone.replace(/\D/g, "");
+      where.phoneNumber = { contains: digits };
+    }
+    if (date) {
+      where.date = date;
+    }
+    if (status && status !== "ALL") {
+      where.status = status;
+    }
+    if (isEmergency === "true") {
+      where.isEmergency = true;
+    }
+
+    const bookings = await prisma.booking.findMany({
+      where,
+      include: {
+        service: true,
+      },
+      orderBy: [
+        { isEmergency: "desc" },
+        { date: "asc" },
+        { time: "asc" },
+      ],
+    });
+
+    return NextResponse.json({ success: true, bookings });
+  } catch (err) {
+    console.error("Error querying bookings:", err);
+    return NextResponse.json(
+      { success: false, error: "Failed to query bookings" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const validated = bookingSchema.parse(body);
+
+    const slotId = `${validated.date}_${validated.time}`;
+
+    // Concurrency Protection with Prisma Transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. ตรวจสอบบริการทันตกรรมที่คนไข้เลือก
+      const selectedService = await tx.service.findUnique({
+        where: { id: validated.serviceId },
+      });
+
+      if (!selectedService) {
+        throw new Error("ไม่พบบริการทันตกรรมที่เลือก กรุณาลองใหม่อีกครั้ง");
+      }
+
+      // 2. Logic จำกัดโควตาสูงสุด 6 คิว/วัน (นับเฉพาะ ขูดหินปูน / อุดฟัน / ถอนฟัน)
+      if (isProcedureQuotaService(selectedService)) {
+        const procedureCount = await tx.booking.count({
+          where: {
+            date: validated.date,
+            status: {
+              in: ["PENDING", "CONFIRMED", "CHECKED_IN", "IN_PROGRESS", "COMPLETED"],
+            },
+            service: {
+              OR: [
+                { nameTh: { contains: "ขูด" } },
+                { nameTh: { contains: "อุด" } },
+                { nameTh: { contains: "ถอน" } },
+                { nameEn: { contains: "Scaling" } },
+                { nameEn: { contains: "Filling" } },
+                { nameEn: { contains: "Extraction" } },
+                { id: { contains: "scaling" } },
+                { id: { contains: "filling" } },
+                { id: { contains: "extraction" } },
+              ],
+              NOT: [
+                { nameTh: { contains: "ตรวจ" } },
+                { nameTh: { contains: "ปรึกษา" } },
+              ],
+            },
+          },
+        });
+
+        if (procedureCount >= 6) {
+          throw new Error(PROCEDURE_QUOTA_EXCEEDED_MESSAGE);
+        }
+      }
+
+      // 3. ตรวจสอบว่าช่วงเวลา (Slot) ถูกปิดรับนัดหมายหรือไม่
+      const slotConfig = await tx.slotConfig.findUnique({
+        where: { id: slotId },
+      });
+
+      if (slotConfig?.isBlocked) {
+        throw new Error(
+          slotConfig.blockedReason || "ขออภัย ช่วงเวลานี้คลินิกปิดรับการนัดหมายชั่วคราว"
+        );
+      }
+
+      const maxCapacity = slotConfig?.maxCapacity ?? 2;
+
+      // 4. นับจำนวนคิวใน Slot เวลาเดียวกัน (ป้องกัน Concurrency ใน Slot ย่อย)
+      const existingCount = await tx.booking.count({
+        where: {
+          date: validated.date,
+          time: validated.time,
+          status: {
+            in: ["PENDING", "CONFIRMED", "CHECKED_IN", "IN_PROGRESS"],
+          },
+          isEmergency: false,
+        },
+      });
+
+      if (existingCount >= maxCapacity) {
+        throw new Error("ขออภัย คิวในช่วงเวลาดังกล่าวเต็มแล้ว กรุณาเลือกช่วงเวลาอื่น");
+      }
+
+      // 5. ออกรหัสคิวแบบเรียงลำดับ Monotonic (เช่น DEN-001, DEN-002)
+      const latest = await tx.booking.findFirst({
+        where: { queueNumber: { startsWith: "DEN-" } },
+        orderBy: { createdAt: "desc" },
+      });
+      let nextNum = 1;
+      if (latest) {
+        const match = latest.queueNumber.match(/DEN-(\d+)/);
+        if (match) {
+          nextNum = parseInt(match[1], 10) + 1;
+        }
+      }
+      const queueNumber = `DEN-${String(nextNum).padStart(3, "0")}`;
+
+      // กำหนดช่วงเวลาเช้า/บ่าย (Period)
+      const hour = parseInt(validated.time.split(":")[0], 10);
+      const period = hour < 12 ? "MORNING" : "AFTERNOON";
+
+      // 6. บันทึกข้อมูลการจองลงฐานข้อมูล
+      const newBooking = await tx.booking.create({
+        data: {
+          queueNumber,
+          date: validated.date,
+          time: validated.time,
+          period,
+          serviceId: validated.serviceId,
+          patientName: validated.patientName.trim(),
+          phoneNumber: validated.phoneNumber.trim(),
+          nationalIdOrHn: validated.nationalIdOrHn.trim(),
+          symptoms: validated.symptoms || null,
+          pdpaAccepted: true,
+          pdpaAcceptedAt: new Date(),
+          status: "PENDING",
+          lineUserId: validated.lineUserId || null,
+        },
+        include: {
+          service: true,
+        },
+      });
+
+      return newBooking;
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "สร้างการจองคิวสำเร็จ กรุณารอเจ้าหน้าที่ตรวจสอบและยืนยัน",
+      booking: result,
+    });
+  } catch (err: unknown) {
+    if (err instanceof z.ZodError) {
+      return NextResponse.json(
+        { success: false, error: err.errors[0]?.message || "ข้อมูลไม่ถูกต้อง" },
+        { status: 400 }
+      );
+    }
+
+    const message = err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการจองคิว";
+
+    // กรณีโควตาหัตถการเต็ม 6 คิว/วัน ให้ Return 400 Bad Request ตามเงื่อนไข
+    if (message === PROCEDURE_QUOTA_EXCEEDED_MESSAGE) {
+      return NextResponse.json(
+        { success: false, error: message },
+        { status: 400 }
+      );
+    }
+
+    const status = message.includes("เต็มแล้ว") || message.includes("ปิดรับ") ? 409 : 500;
+
+    return NextResponse.json(
+      { success: false, error: message },
+      { status }
+    );
+  }
+}

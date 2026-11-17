@@ -1,0 +1,103 @@
+﻿import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+
+export async function GET() {
+  try {
+    const services = await prisma.service.findMany({
+      where: { isActive: true },
+      orderBy: { durationMinutes: "asc" },
+    });
+    return NextResponse.json({ success: true, services });
+  } catch (err) {
+    console.error("Error fetching services:", err);
+    return NextResponse.json(
+      { success: false, error: "Failed to fetch services" },
+      { status: 500 }
+    );
+  }
+}
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { STANDARD_SLOTS } from "@/lib/utils";
+import { SlotAvailability } from "@/lib/types";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const date = searchParams.get("date");
+
+    if (!date) {
+      return NextResponse.json(
+        { success: false, error: "Date parameter is required (YYYY-MM-DD)" },
+        { status: 400 }
+      );
+    }
+
+    // 1. Fetch any explicit slot configs (blocks or customized capacity)
+    const slotConfigs = await prisma.slotConfig.findMany({
+      where: { date },
+    });
+    const configMap = new Map(slotConfigs.map((c) => [c.time, c]));
+
+    // 2. Fetch active bookings count for each slot on this date
+    // Active statuses that consume capacity: PENDING, CONFIRMED, CHECKED_IN, IN_PROGRESS
+    const activeBookings = await prisma.booking.findMany({
+      where: {
+        date,
+        status: {
+          in: ["PENDING", "CONFIRMED", "CHECKED_IN", "IN_PROGRESS"],
+        },
+      },
+      select: {
+        time: true,
+        isEmergency: true,
+      },
+    });
+
+    const bookingCountMap = new Map<string, number>();
+    for (const b of activeBookings) {
+      // Non-emergency standard bookings count towards capacity
+      if (!b.isEmergency) {
+        bookingCountMap.set(b.time, (bookingCountMap.get(b.time) || 0) + 1);
+      }
+    }
+
+    // 3. Assemble availability for each standard slot
+    const slots: SlotAvailability[] = STANDARD_SLOTS.map((s) => {
+      const config = configMap.get(s.time);
+      const isBlocked = config?.isBlocked ?? false;
+      const maxCapacity = config?.maxCapacity ?? 2;
+      const currentBookings = bookingCountMap.get(s.time) || 0;
+
+      let status: "AVAILABLE" | "FULL" | "BLOCKED" = "AVAILABLE";
+      if (isBlocked) {
+        status = "BLOCKED";
+      } else if (currentBookings >= maxCapacity) {
+        status = "FULL";
+      }
+
+      return {
+        time: s.time,
+        period: s.period,
+        status,
+        currentBookings,
+        maxCapacity,
+        blockedReason: config?.blockedReason || null,
+      };
+    });
+
+    return NextResponse.json({
+      success: true,
+      date,
+      slots,
+    });
+  } catch (err) {
+    console.error("Error fetching slots:", err);
+    return NextResponse.json(
+      { success: false, error: "Failed to fetch slots" },
+      { status: 500 }
+    );
+  }
+}

@@ -1,0 +1,86 @@
+// Prisma schema for Q-Dentist
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Service {
+  id              String    @id @default(cuid())
+  nameTh          String
+  nameEn          String
+  durationMinutes Int
+  priceMin        Int
+  priceMax        Int
+  priceDisplay    String
+  description     String
+  icon            String    @default("Tooth")
+  isActive        Boolean   @default(true)
+  bookings        Booking[]
+}
+
+model SlotConfig {
+  id            String   @id // e.g. "2026-11-12_09:00"
+  date          String   // "YYYY-MM-DD"
+  time          String   // "HH:mm"
+  isBlocked     Boolean  @default(false)
+  blockedReason String?
+  maxCapacity   Int      @default(2) // Default 2 patients per slot
+  updatedAt     DateTime @updatedAt
+}
+
+model Booking {
+  id                  String   @id @default(cuid())
+  queueNumber         String   @unique // e.g. "DEN-001" or "EMG-001"
+  date                String   // "YYYY-MM-DD"
+  time                String   // "HH:mm"
+  period              String   // "MORNING" or "AFTERNOON"
+  serviceId           String
+  service             Service  @relation(fields: [serviceId], references: [id])
+  patientName         String
+  phoneNumber         String
+  nationalIdOrHn      String
+  symptoms            String?
+  isEmergency         Boolean  @default(false)
+  emergencySeverity   String?  // "CRITICAL", "URGENT", "MODERATE"
+  emergencyNotes      String?
+  status              String   @default("PENDING") // PENDING, CONFIRMED, CHECKED_IN, IN_PROGRESS, COMPLETED, CANCELLED, REJECTED
+  rejectReason        String?
+  pdpaAccepted        Boolean  @default(true)
+  pdpaAcceptedAt      DateTime @default(now())
+  lineUserId          String?
+  lineNotificationSent Boolean @default(false)
+  reminderSentAt      DateTime?
+  reminderStatus      String?  @default("NOT_SENT") // NOT_SENT, SENT, ATTENDANCE_CONFIRMED, RESCHEDULE_REQUESTED
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  notifications       NotificationLog[]
+}
+
+model NotificationLog {
+  id                  String   @id @default(cuid())
+  bookingId           String?
+  booking             Booking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  type                String   // "APPROVAL", "REJECTION", "ADVANCE_REMINDER", "STATUS_UPDATE", "EMERGENCY_ALERT"
+  recipient           String
+  flexMessagePayload  String   // JSON payload of LINE Flex Message
+  status              String   @default("SUCCESS") // "SUCCESS", "FAILED", "SIMULATED"
+  createdAt           DateTime @default(now())
+}
+
+model EmergencyCase {
+  id          String   @id @default(cuid())
+  lineUserId  String
+  phone       String?
+  latitude    Float?
+  longitude   Float?
+  address     String?  // ที่อยู่/ชื่อสถานที่ที่ส่งมาจาก LINE Location
+  status      String   @default("PENDING") // 'PENDING', 'CONTACTED'
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
