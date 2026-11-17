@@ -187,48 +187,48 @@ function TrackingContent() {
     }
   }
 
-  // Helper for Status Badge
+  // Helper for Status Badge (Modern Government Minimal)
   function getStatusBadge(status: BookingStatus) {
     switch (status) {
       case "PENDING":
         return {
           label: "⏳ รอเจ้าหน้าที่ตรวจสอบ (Pending)",
-          color: "bg-amber-100 text-amber-800 border-amber-300",
+          color: "bg-[#fcf8eb] text-[#b88c1c] border-[#D5A423]/40 font-bold",
         };
       case "CONFIRMED":
         return {
           label: "✅ ได้รับการยืนยันแล้ว (Confirmed)",
-          color: "bg-emerald-100 text-emerald-800 border-emerald-300",
+          color: "bg-emerald-50 text-emerald-800 border-emerald-300 font-bold",
         };
       case "CHECKED_IN":
         return {
           label: "🏥 มาถึงคลินิกแล้ว (Checked In)",
-          color: "bg-blue-100 text-blue-800 border-blue-300",
+          color: "bg-blue-50 text-blue-800 border-blue-300 font-bold",
         };
       case "IN_PROGRESS":
         return {
           label: "🩺 กำลังรับการรักษา (In Progress)",
-          color: "bg-indigo-100 text-indigo-800 border-indigo-300 animate-pulse",
+          color: "bg-indigo-50 text-indigo-800 border-indigo-300 font-bold animate-pulse",
         };
       case "COMPLETED":
         return {
           label: "🎉 รับการรักษาเสร็จสิ้น (Completed)",
-          color: "bg-teal-100 text-teal-800 border-teal-300",
+          color: "bg-[#eef3f9] text-[#063466] border-[#063466]/20 font-bold",
         };
       case "REJECTED":
         return {
           label: "🚫 ไม่อนุมัติการจอง (Rejected)",
-          color: "bg-rose-100 text-rose-800 border-rose-300 font-bold",
+          color: "bg-rose-50 text-rose-800 border-rose-300 font-bold",
         };
       case "CANCELLED":
         return {
           label: "❌ ยกเลิกนัดหมาย (Cancelled)",
-          color: "bg-slate-100 text-slate-700 border-slate-300",
+          color: "bg-slate-100 text-slate-700 border-slate-300 font-bold",
         };
       default:
         return {
           label: status,
-          color: "bg-slate-100 text-slate-800 border-slate-300",
+          color: "bg-slate-100 text-slate-800 border-slate-300 font-bold",
         };
     }
   }
@@ -238,41 +238,41 @@ function TrackingContent() {
   // =========================================================================
   if (!lineProfile || !lineIdToken) {
     return (
-      <div className="max-w-xl mx-auto px-4 py-12 sm:px-6">
-        <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6 text-center">
+      <div className="max-w-xl mx-auto px-4 py-8 sm:py-12">
+        <div className="bg-white rounded-3xl border border-slate-200/90 p-6 sm:p-8 shadow-xs space-y-6 text-center">
           {/* Logo / Clinic Identity */}
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-teal-50 border border-teal-100 text-teal-700 shadow-sm mx-auto">
-            <Sparkles className="w-8 h-8" />
+          <div className="w-14 h-14 rounded-2xl bg-[#063466] text-[#D5A423] flex items-center justify-center mx-auto shadow-sm">
+            <span className="text-2xl sm:text-3xl">🦷</span>
           </div>
 
           <div className="space-y-2">
-            <div className="inline-block px-3 py-1 bg-teal-50 border border-teal-200 text-teal-800 rounded-full text-xs font-semibold">
+            <div className="inline-block px-3 py-1 bg-[#eef3f9] text-[#063466] border border-[#063466]/15 rounded-full text-xs font-semibold">
               DentQ — ระบบติดตามคิวทันตกรรม LINE-First
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-extrabold text-[#063466] tracking-tight">
               เข้าสู่ระบบด้วย LINE เพื่อดูคิวนัดหมาย
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 leading-relaxed max-w-md mx-auto">
+            <p className="text-xs sm:text-sm text-slate-500 leading-relaxed max-w-sm mx-auto">
               ระบบจะแสดงรายการนัดหมายทั้งหมดที่เชื่อมโยงกับบัญชี LINE ของท่านโดยอัตโนมัติ โดยไม่ต้องกรอกเบอร์โทรหรือรหัสคิว
             </p>
           </div>
 
           {/* Benefits Feature List */}
-          <div className="bg-slate-50 rounded-2xl p-4 sm:p-5 border border-slate-100 text-left space-y-3 text-xs text-slate-700">
+          <div className="bg-[#F5F7FA] rounded-2xl p-4 sm:p-5 border border-slate-200/60 text-left space-y-2.5 text-xs text-slate-700">
             <div className="flex items-start gap-2.5">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <CheckCircle2 className="w-4 h-4 text-[#063466] shrink-0 mt-0.5" />
               <span>
                 <strong>ดึงคิวตรวจอัตโนมัติ:</strong> ไม่ต้องจำหรือค้นหารหัสคิว ระบบดึงข้อมูลจากบัญชี LINE ของท่านทันที
               </span>
             </div>
             <div className="flex items-start gap-2.5">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <CheckCircle2 className="w-4 h-4 text-[#063466] shrink-0 mt-0.5" />
               <span>
                 <strong>คุ้มครองความเป็นส่วนตัว 100%:</strong> ผู้ใช้แต่ละคนเห็นเฉพาะคิวของตนเอง ไม่เปิดเผยข้อมูลแก่ผู้อื่น
               </span>
             </div>
             <div className="flex items-start gap-2.5">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <CheckCircle2 className="w-4 h-4 text-[#063466] shrink-0 mt-0.5" />
               <span>
                 <strong>อัปเดตสถานะแบบ Real-time:</strong> ทราบผลการตรวจสอบและการนัดหมายได้ทันที
               </span>
@@ -280,32 +280,34 @@ function TrackingContent() {
           </div>
 
           {/* LINE Login Action Button */}
-          <div className="pt-2 space-y-3">
+          <div className="pt-1 space-y-3">
             <button
               type="button"
               disabled={isLoggingInLine || !liffInitialized}
               onClick={handleLineLogin}
-              className="w-full inline-flex items-center justify-center gap-3 px-6 py-3.5 rounded-2xl text-sm font-bold text-white bg-[#06C755] hover:bg-[#05b34c] shadow-lg shadow-emerald-500/20 hover:shadow-xl transition-all cursor-pointer disabled:opacity-60"
+              className="w-full h-12 inline-flex items-center justify-center gap-2.5 px-6 rounded-2xl text-sm font-bold text-white bg-[#06C755] hover:bg-[#05b34c] shadow-sm hover:shadow transition-all cursor-pointer disabled:opacity-60"
             >
               {isLoggingInLine ? (
                 <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                   <span>กำลังเชื่อมต่อกับ LINE...</span>
                 </>
               ) : (
                 <>
                   <span className="text-lg">💬</span>
-                  <span>เข้าสู่ระบบด้วย LINE เพื่อดูคิวตรวจ</span>
+                  <span>เข้าสู่ระบบด้วย LINE เพื่อดูคิวนัดหมาย</span>
                 </>
               )}
             </button>
 
             {/* Demo Account Button for Browser Reviewers */}
             {(process.env.NEXT_PUBLIC_DEMO_MODE === "true" || process.env.NODE_ENV === "development") && (
-              <div className="pt-2">
-                <div className="relative flex py-2 items-center">
+              <div className="pt-2 space-y-2">
+                <div className="relative flex py-1 items-center">
                   <div className="flex-grow border-t border-slate-200" />
-                  <span className="flex-shrink mx-3 text-[11px] font-semibold text-slate-400">หรือ</span>
+                  <span className="flex-shrink mx-3 text-[11px] font-medium text-slate-400">
+                    หรือสำหรับทดลองใช้งาน
+                  </span>
                   <div className="flex-grow border-t border-slate-200" />
                 </div>
 
@@ -319,19 +321,21 @@ function TrackingContent() {
                     });
                     setLineIdToken(DEMO_MOCK_USER.idToken);
                   }}
-                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-xs font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-300 shadow-sm transition-all cursor-pointer"
+                  className="w-full py-3 px-4 rounded-2xl text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2"
                 >
                   <span>🧪</span>
-                  <span>ทดลองใช้งานด้วยบัญชีจำลอง (สมชาย มั่นคง - Demo Account)</span>
+                  <span className="text-amber-900 font-bold">
+                    ทดลองใช้งานด้วยบัญชีจำลอง (สมชาย มั่นคง - Demo Account)
+                  </span>
                 </button>
-                <p className="text-[10px] text-amber-700 mt-1.5 text-center">
+                <p className="text-[10px] text-slate-500 text-center">
                   * สำหรับเปิดดู Mockup บนเบราว์เซอร์ แสดงคิวตัวอย่าง PENDING, CONFIRMED และ REJECTED
                 </p>
               </div>
             )}
 
-            <p className="text-[11px] text-slate-400">
-              * DentQ ให้บริการติดตามคิวผ่าน LINE เพื่อความปลอดภัยและเป็นส่วนตัวตามมาตรฐาน PDPA
+            <p className="text-[11px] text-slate-400 pt-1">
+              * DentQ ให้บริการติดตามคิวผ่าน LINE เพื่อความปลอดภัยและเป็นส่วนตัว
             </p>
           </div>
         </div>
@@ -350,18 +354,18 @@ function TrackingContent() {
   // MAIN TRACKING VIEW (When authenticated with LINE)
   // =========================================================================
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 sm:px-6 space-y-6">
+    <div className="max-w-4xl mx-auto px-4 py-6 sm:py-10 space-y-6">
       {/* User LINE Profile Header Banner */}
-      <div className="bg-white border border-teal-200 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           {lineProfile.pictureUrl ? (
             <img
               src={lineProfile.pictureUrl}
               alt={lineProfile.displayName}
-              className="w-11 h-11 rounded-full border-2 border-teal-500 object-cover shrink-0"
+              className="w-10 h-10 rounded-full border-2 border-[#063466]/20 object-cover shrink-0"
             />
           ) : (
-            <div className="w-11 h-11 rounded-full bg-[#06C755] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-sm">
+            <div className="w-10 h-10 rounded-full bg-[#06C755] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
               LINE
             </div>
           )}
@@ -371,11 +375,11 @@ function TrackingContent() {
                 {lineProfile.displayName}
               </span>
               {lineProfile.userId === DEMO_MOCK_USER.userId ? (
-                <span className="text-[10px] font-bold bg-amber-100 text-amber-900 px-2.5 py-0.5 rounded-full border border-amber-300">
+                <span className="text-[10px] font-bold bg-[#fcf8eb] text-[#b88c1c] border border-[#D5A423]/40 px-2 py-0.5 rounded-full">
                   🧪 บัญชีจำลอง Demo
                 </span>
               ) : (
-                <span className="text-[10px] font-bold bg-teal-100 text-teal-800 px-2.5 py-0.5 rounded-full border border-teal-200">
+                <span className="text-[10px] font-bold bg-[#eef3f9] text-[#063466] border border-[#063466]/20 px-2 py-0.5 rounded-full">
                   ✓ ยืนยันตัวตนผ่าน LINE แล้ว
                 </span>
               )}
@@ -393,7 +397,7 @@ function TrackingContent() {
             type="button"
             disabled={loading}
             onClick={() => fetchBookings()}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-teal-700 bg-teal-50 hover:bg-teal-100 rounded-xl transition-colors disabled:opacity-50 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#063466] bg-[#eef3f9] hover:bg-[#dfeaf4] border border-[#063466]/15 rounded-xl transition-colors disabled:opacity-50 cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
             <span>รีเฟรช</span>
@@ -412,7 +416,7 @@ function TrackingContent() {
 
       {/* Page Title */}
       <div className="space-y-1">
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+        <h1 className="text-xl sm:text-2xl font-extrabold text-[#063466] tracking-tight">
           รายการนัดหมายทันตกรรมของคุณ
         </h1>
         <p className="text-xs sm:text-sm text-slate-500">
@@ -422,7 +426,7 @@ function TrackingContent() {
 
       {/* Demo Tracking Notice */}
       {(process.env.NEXT_PUBLIC_DEMO_MODE === "true" || lineProfile.userId === DEMO_MOCK_USER.userId) && (
-        <div className="bg-amber-50 border border-amber-300 rounded-2xl p-3.5 text-xs text-amber-900 flex items-center gap-2.5 shadow-sm">
+        <div className="bg-[#fcf8eb] border border-[#D5A423]/40 rounded-2xl p-3.5 text-xs text-amber-900 flex items-center gap-2.5 shadow-xs">
           <span className="text-base shrink-0">⚠️</span>
           <span>
             <strong>โหมดสาธิต (Demo Tracking):</strong> แสดงรายการคิวตัวอย่างสำหรับทดสอบระบบ (DEN-001 รอตรวจสอบ, DEN-002 ยืนยันแล้ว, DEN-005 ไม่อนุมัติพร้อมเหตุผลตัวอย่าง)
@@ -432,7 +436,7 @@ function TrackingContent() {
 
       {/* Error Alert */}
       {fetchError && (
-        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm flex items-center justify-between gap-3 shadow-sm">
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm flex items-center justify-between gap-3 shadow-xs">
           <div className="flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{fetchError}</span>
@@ -460,13 +464,13 @@ function TrackingContent() {
 
       {/* Bookings List or Empty State */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-16 gap-3 bg-white rounded-3xl border border-slate-200">
-          <Loader2 className="w-10 h-10 animate-spin text-teal-600" />
+        <div className="flex flex-col items-center justify-center py-16 gap-3 bg-white rounded-3xl border border-slate-200/90 shadow-xs">
+          <Loader2 className="w-10 h-10 animate-spin text-[#063466]" />
           <p className="text-xs text-slate-500 font-medium">กำลังโหลดข้อมูลคิวของท่าน...</p>
         </div>
       ) : bookings.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-3xl border border-slate-200 p-8 max-w-xl mx-auto space-y-4 shadow-sm">
-          <div className="w-14 h-14 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center mx-auto">
+        <div className="text-center py-16 bg-white rounded-3xl border border-slate-200/90 p-8 max-w-xl mx-auto space-y-4 shadow-xs">
+          <div className="w-14 h-14 rounded-2xl bg-[#eef3f9] text-[#063466] flex items-center justify-center mx-auto">
             <Calendar className="w-7 h-7" />
           </div>
           <div className="space-y-1">
@@ -480,10 +484,10 @@ function TrackingContent() {
           <div className="pt-2">
             <Link
               href="/book"
-              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-teal-600 text-white text-xs font-bold hover:bg-teal-700 transition-colors shadow-sm"
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#063466] hover:bg-[#05264b] text-white text-xs font-bold transition-colors shadow-xs"
             >
               <span>+ จองคิวนัดหมายใหม่</span>
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-4 h-4 text-[#D5A423]" />
             </Link>
           </div>
         </div>
@@ -497,31 +501,31 @@ function TrackingContent() {
             return (
               <div
                 key={b.id || b.queueNumber}
-                className={`bg-white rounded-3xl border-2 transition-all shadow-md overflow-hidden ${
+                className={`bg-white rounded-3xl border-2 transition-all shadow-sm overflow-hidden ${
                   isEmergency
                     ? "border-rose-400 shadow-rose-100"
                     : isRejected
                     ? "border-rose-300 shadow-rose-50"
-                    : "border-slate-200"
+                    : "border-slate-200/90"
                 }`}
               >
                 {/* Header Banner */}
                 <div
                   className={`p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3 text-white ${
                     isEmergency
-                      ? "bg-gradient-to-r from-rose-600 to-red-700"
-                      : isRejected
                       ? "bg-gradient-to-r from-rose-700 to-red-800"
-                      : "bg-gradient-to-r from-teal-700 to-cyan-700"
+                      : isRejected
+                      ? "bg-gradient-to-r from-rose-800 to-red-900"
+                      : "bg-[#063466]"
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center text-xl font-bold">
+                    <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-xs flex items-center justify-center text-xl font-bold">
                       {isEmergency ? "🚨" : isRejected ? "✕" : "🦷"}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-extrabold text-xl tracking-tight">
+                        <span className="font-extrabold text-xl tracking-tight text-white">
                           {b.queueNumber}
                         </span>
                         {isEmergency && (
@@ -530,15 +534,15 @@ function TrackingContent() {
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-teal-100 opacity-90">
-                        Q-Dentist สาขาพญาไท • คิวนัดหมายวันที่ {formatThaiDate(b.date, { short: true })}
+                      <p className="text-xs text-slate-300">
+                        Q-Dentist สาขาพญาไท (ข้อมูลจำลอง) • คิวนัดหมายวันที่ {formatThaiDate(b.date, { short: true })}
                       </p>
                     </div>
                   </div>
 
                   {/* Status Badge */}
                   <div
-                    className={`px-3 py-1.5 rounded-full text-xs font-bold border ${badge.color} shadow-sm`}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold border ${badge.color} shadow-xs`}
                   >
                     {badge.label}
                   </div>
@@ -554,7 +558,7 @@ function TrackingContent() {
                         {b.service?.nameTh || "บริการทันตกรรมทั่วไป"}
                       </p>
                       {b.service?.priceDisplay && (
-                        <p className="text-[11px] text-teal-700 font-medium">
+                        <p className="text-[11px] text-[#063466] font-semibold">
                           {b.service.priceDisplay}
                         </p>
                       )}
@@ -565,16 +569,16 @@ function TrackingContent() {
                       <p className="font-bold text-slate-900 text-sm">
                         {formatThaiDate(b.date, { short: true })}
                       </p>
-                      <p className="text-[11px] text-teal-700 font-bold">{b.time} น.</p>
+                      <p className="text-[11px] text-[#063466] font-bold">{b.time} น.</p>
                     </div>
 
                     <div className="p-3 bg-slate-50 rounded-xl space-y-1">
                       <span className="text-slate-400 font-medium">สิทธิการรักษาพยาบาล</span>
-                      <p className="font-bold text-teal-800 text-sm">
+                      <p className="font-bold text-[#063466] text-sm">
                         {b.medicalRights || "ไม่ได้ระบุ"}
                       </p>
-                      <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-0.5">
-                        <ShieldCheck className="w-3 h-3" /> ยินยอม PDPA แล้ว
+                      <span className="text-[10px] text-emerald-700 font-semibold flex items-center gap-0.5">
+                        <ShieldCheck className="w-3 h-3 text-emerald-600" /> ยืนยันสิทธิการรักษาแล้ว
                       </span>
                     </div>
 
@@ -589,7 +593,7 @@ function TrackingContent() {
 
                   {/* Rejection Alert Box */}
                   {isRejected && (
-                    <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-xs space-y-2.5">
+                    <div className="p-4 bg-rose-50 border border-rose-200/80 rounded-2xl text-xs space-y-2.5">
                       <div className="flex items-center gap-2 font-bold text-rose-900 text-sm">
                         <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
                         <span>ไม่อนุมัติการจอง</span>
@@ -597,7 +601,7 @@ function TrackingContent() {
                       {b.rejectReason && b.rejectReason.trim() ? (
                         <div className="space-y-1">
                           <span className="text-[11px] font-bold text-rose-700">สาเหตุ / คำชี้แจงจากคลินิก:</span>
-                          <p className="text-rose-800 leading-relaxed font-medium bg-white/70 p-2.5 rounded-xl border border-rose-200/60">
+                          <p className="text-rose-900 leading-relaxed font-medium bg-white/80 p-3 rounded-xl border border-rose-200/60">
                             {b.rejectReason.trim()}
                           </p>
                         </div>
@@ -605,9 +609,10 @@ function TrackingContent() {
                       <div className="pt-1">
                         <Link
                           href="/book"
-                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-sm transition-colors"
+                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#063466] hover:bg-[#05264b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
                         >
                           <span>📅 จองคิวใหม่</span>
+                          <ChevronRight className="w-3.5 h-3.5 text-[#D5A423]" />
                         </Link>
                       </div>
                     </div>
@@ -618,8 +623,8 @@ function TrackingContent() {
                     <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl space-y-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <Bell className="w-4 h-4 text-blue-600" />
-                          <span className="text-xs font-bold text-blue-900">
+                          <Bell className="w-4 h-4 text-[#063466]" />
+                          <span className="text-xs font-bold text-[#063466]">
                             การยืนยันเข้ารับบริการ (Advance Confirmation)
                           </span>
                         </div>
@@ -635,7 +640,7 @@ function TrackingContent() {
                         )}
                       </div>
 
-                      <p className="text-xs text-blue-800 leading-relaxed">
+                      <p className="text-xs text-slate-700 leading-relaxed">
                         เพื่อให้ทางคลินิกจัดเตรียมทันตแพทย์และห้องทำหัตถการได้อย่างมีประสิทธิภาพ
                         โปรดยืนยันการมาของท่าน หรือแจ้งขอเลื่อนนัดหมายล่วงหน้า
                       </p>
@@ -667,8 +672,8 @@ function TrackingContent() {
                   {/* Actions & Copy */}
                   <div className="pt-2 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs text-slate-500 border-t border-slate-100">
                     <div className="flex items-center gap-1.5">
-                      <MapPin className="w-4 h-4 text-teal-600 shrink-0" />
-                      <span>สาขาพญาไท อาคารเดอะพลาซ่า ชั้น 2 (BTS พญาไท ทางออก 3)</span>
+                      <MapPin className="w-4 h-4 text-[#063466] shrink-0" />
+                      <span>สาขาพญาไท อาคารเดอะพลาซ่า (ข้อมูลจำลอง)</span>
                     </div>
 
                     <div className="flex items-center gap-3">
@@ -681,7 +686,7 @@ function TrackingContent() {
                           setCopiedId(b.queueNumber);
                           setTimeout(() => setCopiedId(null), 2000);
                         }}
-                        className="font-medium text-teal-700 hover:underline flex items-center gap-1 cursor-pointer"
+                        className="font-medium text-[#063466] hover:underline flex items-center gap-1 cursor-pointer"
                       >
                         <Copy className="w-3.5 h-3.5" />
                         <span>{copiedId === b.queueNumber ? "คัดลอกแล้ว!" : "คัดลอกข้อมูลบัตรคิว"}</span>
@@ -689,9 +694,9 @@ function TrackingContent() {
 
                       <a
                         href="tel:029998888"
-                        className="font-bold text-teal-700 hover:underline flex items-center gap-1"
+                        className="font-bold text-[#063466] hover:underline flex items-center gap-1"
                       >
-                        <Phone className="w-3.5 h-3.5" /> โทร 02-999-8888
+                        <Phone className="w-3.5 h-3.5" /> โทร 02-999-8888 (ข้อมูลจำลอง)
                       </a>
                     </div>
                   </div>
@@ -717,7 +722,7 @@ export default function TrackingPage() {
     <Suspense
       fallback={
         <div className="flex justify-center py-20">
-          <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
+          <Loader2 className="w-8 h-8 animate-spin text-[#063466]" />
         </div>
       }
     >

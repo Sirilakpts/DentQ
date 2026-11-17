@@ -127,6 +127,31 @@ node .\test-vercel-readiness-stepv14.cjs
 node .\test-styling-stepui1.cjs
 ```
 
+รันสคริปต์ทดสอบการแยก UI ประชาชนและเจ้าหน้าที่ (Step UI 3):
+```powershell
+node .\test-ui-separation-stepui3.cjs
+```
+
+รันสคริปต์ทดสอบการปรับปรุงหน้าหลัก Clean Home Redesign (Step UI 4):
+```powershell
+node .\test-home-redesign-stepui4.cjs
+```
+
+รันสคริปต์ทดสอบความถูกต้องของข้อความหน้าหลัก Home Content Accuracy (Step UI 4.1):
+```powershell
+node .\test-home-accuracy-stepui41.cjs
+```
+
+รันสคริปต์ทดสอบ LINE-First Booking Login Gate (Step UI 6):
+```powershell
+node .\test-login-gate-stepui6.cjs
+```
+
+รันสคริปต์ทดสอบ Final Public UX Polish (Step UI 7):
+```powershell
+node .\test-public-polish-stepui7.cjs
+```
+
 ---
 
 ## 3. วิธีทดสอบ API Endpoint
@@ -179,6 +204,10 @@ Invoke-RestMethod -Uri http://localhost:3000/api/test-sheets
 - **Step V1.3 (Safe Demo Frontend UX):** PASS (แสดง Top Banner โหมดสาธิตผ่าน NEXT_PUBLIC_DEMO_MODE=true ใน Root Layout, หน้า /book และ /tracking มีปุ่ม 'ทดลองใช้งานด้วยบัญชีจำลอง' สำหรับ Browser โดยใช้ DEMO_MOCK_USER ไม่ปะปนกับ LINE Login จริง, แสดง Digital Ticket สถานะ PENDING พร้อมป้ายคิวจำลองไม่บันทึกถาวร, หน้า Tracking แสดง 3 สถานะตัวอย่าง PENDING/CONFIRMED/REJECTED พร้อมเหตุผลจริงและปุ่มจองคิวใหม่, หน้า Login มีปุ่ม 'เข้าชมแดชบอร์ดสาธิต' 1-Click สำหรับผู้ตรวจงาน, หน้า Admin แสดงป้ายเตือนการสาธิตอย่างชัดเจน ไม่ส่งข้อความ LINE จริงและไม่บันทึกข้อมูลถาวร, ฟอนต์ Noto Sans Thai และ UX/UI เดิมคงเดิม 100%)
 - **Step V1.4 (Vercel Build & Security Readiness):** PASS (Next.js Production Build สำเร็จครบ 16 หน้า, TypeScript 0 errors, ตรวจสอบ Git Status และ .gitignore ปลอดภัย 100% ไม่มี .env, Service Account JSON หรือไฟล์ Database ถูกติดตามใน Git, แยกระบบ Demo Mode สมบูรณ์ [Air-Gapped], หน้าและ API ทุกเส้นทางพร้อมสำหรับ Vercel Serverless Statelessness)
 - **Step UI 1 (Fix Broken Styling & Noto Sans Thai Font):** PASS (แก้ไขการเชื่อมโยงฟอนต์ Noto Sans Thai และ Sarabun ใน src/app/layout.tsx, src/app/globals.css และ tailwind.config.ts, เพิ่ม Google Fonts preconnect และ stylesheet link ใน RootLayout, ตั้งค่า body font-sans และ fallback font stack ครบถ้วน, Next.js build ผ่าน 100% สร้าง CSS bundle ขนาด ~48.9 KB พร้อมคลาส Tailwind utility ครบถ้วน, หน้า Home, Booking, Tracking และ Admin แสดงผลถูกต้องตามดีไซน์เดิม 0 TypeScript errors)
+- **Step UI 3 (Strict Public / Admin UI Separation):** PASS (แยกเมนูและการแสดงผลระหว่างประชาชนและเจ้าหน้าที่เด็ดขาด 100%, Public UI [/, /book, /tracking] ไม่มีคำว่า admin, ไม่มีลิงก์ Dashboard, ไม่มี Staff Login, ไม่มี Emergency Management หรือเครื่องมือ Developer, ฝั่งประชาชนแสดงเฉพาะ 3 หน้าหลัก [หน้าหลัก, จองคิว, ตรวจสอบคิว], หน้าจอระบบหลังบ้าน [/admin*] และหน้า Login เจ้าหน้าที่ [/login] ยังคงเดิมและปลอดภัย 100%)
+- **Step UI 4 (Clean Dental Home Redesign):** PASS (ปรับปรุงหน้า Home ให้ทันสมัย สะอาดตา ภายใต้แนวคิด Modern Government Minimal + Friendly Dental Healthcare, Hero Section หัวข้อ 'จองคิวทำฟันออนไลน์' พร้อมปุ่ม Primary 'จองคิวทำฟันเลย' เชื่อมไป /book และปุ่มรองตรวจสอบคิว, ภาพประกอบเวกเตอร์ทันตแพทย์ตรวจสุขภาพฟันเด็กโทนฟ้าอ่อนเป็นมิตร ไร้ภาพภายนอกที่ไม่ได้รับอนุญาต, แสดง 4 ขั้นตอนการจองคิวแนวนอนบน Desktop และ 2 คอลัมน์บน Mobile, แสดง 4 การ์ดข้อมูลสำคัญ [บริการทันตกรรม, ตรวจสอบคิว, เวลาทำการ, ติดต่อคลินิก] อ้างอิงข้อมูลจริงของระบบ, Minimal Footer มีเฉพาะข้อมูลติดต่อทางการ ป้ายแจ้งเตือน Demo Mode และไร้ลิงก์ Admin 100%)
+- **Step UI 4.1 (Home Content Accuracy Fix):** PASS (แก้ไขข้อความหน้า Home ให้ถูกต้องและโปร่งใส 100%: 1. ข้อมูลสถานที่ เวลา และเบอร์โทรศัพท์กำกับว่าเป็นข้อมูลจำลองอย่างชัดเจน ไม่แอบอ้างเป็นข้อมูลทางการและมีหมายเหตุจะแจ้งช่องทางจริงเมื่อเปิดให้บริการ, 2. ข้อความจำนวนคิวระบุรอบเช้าไม่เกิน 6 คิวรวมทุกบริการ และรอบบ่ายเป็นไปตามสล็อตบริการปกติโดยไม่กล่าวอ้าง 6 คิว, 3. ตัดคำกล่าวอ้าง PDPA Compliant, Real-time และการส่งแจ้งเตือน LINE อัตโนมัติบนเดโมออก เพื่อให้สอดคล้องกับสภาพแวดล้อมสาธิต, 4. คงดีไซน์เดิม Hero ทันตแพทย์เด็ก, 4 ขั้นตอน, 4 การ์ด และไร้ Admin Navigation 100%)
+- **Step UI 6 (LINE-First Booking Login Gate):** PASS (ปรับปรุง Login Gate หน้า /book ให้สะอาด ทันสมัย ภายใต้แนวคิด Modern Government Minimal: 1. หัวข้อ 'เข้าสู่ระบบเพื่อจองคิวทำฟัน' คำอธิบายกระชับ 2 บรรทัด, 2. บังคับยืนยันตัวตนด้วย LINE ก่อนเข้าสู่ Booking Stepper ไร้ Guest Mode, 3. คง LIFF initialization และ Token reuse โดยไม่บังคับ Login ซ้ำ, 4. ปุ่ม Primary สีเขียว LINE Official #06C755 และปุ่ม Secondary บัญชีจำลองสำหรับโหมด Demo พร้อมคำชี้แจงชัดเจน, 5. คำเตือน Red-flag 1669 กระชับ, 6. ตัดข้อความซ้ำซ้อนและคำกล่าวอ้าง PDPA ในกล่องไฮไลต์, 7. Zero Admin Navigation 100%)
 
 ---
 

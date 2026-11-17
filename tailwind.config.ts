@@ -9,6 +9,15 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        gov: {
+          primary: "#063466",
+          primaryHover: "#05264b",
+          primaryLight: "#eef3f9",
+          accent: "#D5A423",
+          accentHover: "#b88c1c",
+          accentLight: "#fcf8eb",
+          bg: "#F5F7FA",
+        },
         dental: {
           50: "#f0fdfa",
           100: "#ccfbf1",

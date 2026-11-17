@@ -17,20 +17,20 @@ export default function Navbar() {
   const isAdmin = pathname.startsWith("/admin");
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center text-white shadow-md shadow-teal-500/20 group-hover:scale-105 transition-transform">
+          <div className="w-10 h-10 rounded-xl bg-[#063466] flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform">
             <span className="text-xl">🦷</span>
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="font-extrabold text-xl tracking-tight bg-gradient-to-r from-teal-700 to-cyan-700 bg-clip-text text-transparent">
-                Q-Dentist
+              <span className="font-extrabold text-xl tracking-tight text-[#063466]">
+                DentQ
               </span>
-              <span className="text-[10px] font-bold uppercase tracking-wider bg-teal-100 text-teal-800 px-1.5 py-0.5 rounded">
-                Clinic
+              <span className="text-[10px] font-bold uppercase tracking-wider bg-[#fcf8eb] text-[#b88c1c] border border-[#D5A423]/40 px-1.5 py-0.5 rounded">
+                คลินิกทันตกรรม
               </span>
             </div>
             <p className="text-[11px] text-slate-500 -mt-0.5">ระบบจองคิวทันตกรรมออนไลน์</p>
@@ -38,16 +38,15 @@ export default function Navbar() {
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-1 lg:gap-2">
+        <nav className="hidden md:flex items-center gap-1.5">
           {isAdmin ? (
             // ==========================================
-            // กรณี pathname.startsWith('/admin') (หน้าของแอดมิน)
-            // แสดง: แดชบอร์ดเจ้าหน้าที่, แทรกคิวฉุกเฉิน, LINE Flex
+            // แอดมิน: แสดงแดชบอร์ด, แทรกคิวฉุกเฉิน, LINE Flex
             // ==========================================
             <>
               <Link
                 href="/"
-                className="flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors mr-1"
+                className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors mr-1"
                 title="ไปยังหน้าเว็บไซต์คนไข้"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
@@ -68,8 +67,8 @@ export default function Navbar() {
                 href="/admin"
                 className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold transition-all ${
                   pathname === "/admin"
-                    ? "text-white bg-teal-600 hover:bg-teal-700 shadow-sm shadow-teal-600/30"
-                    : "text-slate-700 hover:text-teal-700 hover:bg-teal-50"
+                    ? "text-white bg-[#063466] hover:bg-[#05264b] shadow-sm"
+                    : "text-slate-700 hover:text-[#063466] hover:bg-slate-50"
                 }`}
               >
                 <LayoutDashboard className="w-4 h-4" />
@@ -87,19 +86,30 @@ export default function Navbar() {
             </>
           ) : (
             // ==========================================
-            // กรณีอื่นๆ (หน้าเว็บสาธารณะของคนไข้)
-            // แสดงเฉพาะ "จองคิวตรวจฟัน" และ "ตรวจสอบคิว" เท่านั้น
+            // ประชาชนทั่วไป: แสดงเฉพาะ "หน้าหลัก", "จองคิว", "ตรวจสอบคิว"
+            // ซ่อนเมนูของระบบหลังบ้านทั้งหมด
             // ==========================================
             <>
+              <Link
+                href="/"
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  pathname === "/"
+                    ? "bg-[#eef3f9] text-[#063466] font-bold border border-[#063466]/15"
+                    : "text-slate-700 hover:text-[#063466] hover:bg-slate-50"
+                }`}
+              >
+                <span>หน้าหลัก</span>
+              </Link>
+
               <Link
                 href="/book"
                 className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
                   pathname === "/book"
-                    ? "bg-teal-50 text-teal-700 font-bold"
-                    : "text-slate-700 hover:text-teal-700 hover:bg-teal-50"
+                    ? "bg-[#eef3f9] text-[#063466] font-bold border border-[#063466]/15"
+                    : "text-slate-700 hover:text-[#063466] hover:bg-slate-50"
                 }`}
               >
-                <Calendar className="w-4 h-4 text-teal-600" />
+                <Calendar className="w-4 h-4 text-[#063466]" />
                 <span>จองคิวตรวจฟัน</span>
               </Link>
 
@@ -107,18 +117,18 @@ export default function Navbar() {
                 href="/tracking"
                 className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
                   pathname === "/tracking"
-                    ? "bg-teal-50 text-teal-700 font-bold"
-                    : "text-slate-700 hover:text-teal-700 hover:bg-teal-50"
+                    ? "bg-[#eef3f9] text-[#063466] font-bold border border-[#063466]/15"
+                    : "text-slate-700 hover:text-[#063466] hover:bg-slate-50"
                 }`}
               >
-                <Search className="w-4 h-4 text-teal-600" />
+                <Search className="w-4 h-4 text-[#063466]" />
                 <span>ตรวจสอบคิว</span>
               </Link>
             </>
           )}
         </nav>
 
-        {/* Mobile Actions */}
+        {/* Mobile Header Action */}
         <div className="flex md:hidden items-center gap-2">
           {isAdmin ? (
             <>
@@ -130,7 +140,7 @@ export default function Navbar() {
               </Link>
               <Link
                 href="/admin"
-                className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700"
+                className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-[#063466]"
               >
                 แดชบอร์ด
               </Link>
@@ -145,7 +155,7 @@ export default function Navbar() {
               </Link>
               <Link
                 href="/book"
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700"
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[#063466] hover:bg-[#05264b]"
               >
                 จองคิว
               </Link>
@@ -154,21 +164,21 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Mobile Sub Navigation bar */}
-      <div className="md:hidden flex border-t border-slate-100 bg-slate-50/90 text-xs overflow-x-auto divide-x divide-slate-200">
+      {/* Mobile Sub Navigation bar (ประชาชนเห็นเฉพาะ หน้าหลัก จองคิว และเช็กคิว) */}
+      <div className="md:hidden flex border-t border-slate-100 bg-[#F5F7FA] text-xs divide-x divide-slate-200">
         {isAdmin ? (
           <>
             <Link
               href="/admin"
-              className={`flex-1 py-2 px-2 text-center font-medium whitespace-nowrap ${
-                pathname === "/admin" ? "text-teal-800 font-bold bg-white" : "text-slate-700"
+              className={`flex-1 py-2.5 px-2 text-center font-medium whitespace-nowrap ${
+                pathname === "/admin" ? "text-[#063466] font-bold bg-white" : "text-slate-700"
               }`}
             >
               🩺 แดชบอร์ด
             </Link>
             <Link
               href="/admin/emergency"
-              className={`flex-1 py-2 px-2 text-center font-medium whitespace-nowrap ${
+              className={`flex-1 py-2.5 px-2 text-center font-medium whitespace-nowrap ${
                 pathname === "/admin/emergency" ? "text-rose-800 font-bold bg-white" : "text-rose-700"
               }`}
             >
@@ -176,7 +186,7 @@ export default function Navbar() {
             </Link>
             <Link
               href="/admin/line-preview"
-              className={`flex-1 py-2 px-2 text-center font-medium whitespace-nowrap ${
+              className={`flex-1 py-2.5 px-2 text-center font-medium whitespace-nowrap ${
                 pathname === "/admin/line-preview" ? "text-emerald-800 font-bold bg-white" : "text-emerald-700"
               }`}
             >
@@ -186,17 +196,25 @@ export default function Navbar() {
         ) : (
           <>
             <Link
-              href="/book"
-              className={`flex-1 py-2 px-2 text-center font-medium whitespace-nowrap ${
-                pathname === "/book" ? "text-teal-800 font-bold bg-white" : "text-teal-700"
+              href="/"
+              className={`flex-1 py-2.5 px-2 text-center font-medium whitespace-nowrap ${
+                pathname === "/" ? "text-[#063466] font-bold bg-white border-b-2 border-[#063466]" : "text-slate-600"
               }`}
             >
-              📅 จองคิวตรวจฟัน
+              🏠 หน้าหลัก
+            </Link>
+            <Link
+              href="/book"
+              className={`flex-1 py-2.5 px-2 text-center font-medium whitespace-nowrap ${
+                pathname === "/book" ? "text-[#063466] font-bold bg-white border-b-2 border-[#063466]" : "text-slate-600"
+              }`}
+            >
+              📅 จองคิว
             </Link>
             <Link
               href="/tracking"
-              className={`flex-1 py-2 px-2 text-center font-medium whitespace-nowrap ${
-                pathname === "/tracking" ? "text-teal-800 font-bold bg-white" : "text-slate-700"
+              className={`flex-1 py-2.5 px-2 text-center font-medium whitespace-nowrap ${
+                pathname === "/tracking" ? "text-[#063466] font-bold bg-white border-b-2 border-[#063466]" : "text-slate-600"
               }`}
             >
               🔍 ตรวจสอบคิว
