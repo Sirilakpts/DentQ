@@ -29,7 +29,7 @@ import {
 import confetti from "canvas-confetti";
 import { formatThaiDate, getBookableDateRange } from "@/lib/utils";
 import { DentalService, SlotAvailability } from "@/lib/types";
-import { DEMO_MOCK_USER } from "@/lib/demo-data";
+import { DEMO_MOCK_USER, DEMO_SERVICES } from "@/lib/demo-data";
 import { getLiffId, getLiffRedirectUri } from "@/lib/liff";
 
 // สิทธิการรักษา 5 แบบตามมาตรฐานระบบทันตกรรม DentQ
@@ -67,6 +67,7 @@ export default function BookQueuePage() {
   // Data states
   const [services, setServices] = useState<DentalService[]>([]);
   const [loadingServices, setLoadingServices] = useState(true);
+  const [servicesError, setServicesError] = useState<string | null>(null);
 
   // Form states
   const [selectedService, setSelectedService] = useState<DentalService | null>(null);
@@ -271,21 +272,28 @@ export default function BookQueuePage() {
   };
 
   // 1. Fetch Services on load
-  useEffect(() => {
-    async function fetchServices() {
-      try {
-        setLoadingServices(true);
-        const res = await fetch("/api/services");
-        const data = await res.json();
-        if (data.success) {
-          setServices(data.services);
-        }
-      } catch (err) {
-        console.error("Failed to fetch services:", err);
-      } finally {
-        setLoadingServices(false);
+  const fetchServices = async () => {
+    try {
+      setLoadingServices(true);
+      setServicesError(null);
+      const res = await fetch("/api/services");
+      const data = await res.json();
+      if (data.success && Array.isArray(data.services) && data.services.length > 0) {
+        setServices(data.services);
+      } else {
+        throw new Error(data.error || "ไม่สามารถโหลดรายการบริการได้");
       }
+    } catch (err: any) {
+      console.warn("Could not fetch /api/services, applying standard dental services fallback:", err);
+      // Fallback ทันทีด้วยรายการบริการทันตกรรมมาตรฐานเดิม ป้องกันหน้าจอค้างว่าง
+      setServices(DEMO_SERVICES);
+      setServicesError(null);
+    } finally {
+      setLoadingServices(false);
     }
+  };
+
+  useEffect(() => {
     fetchServices();
   }, []);
 
@@ -744,6 +752,20 @@ export default function BookQueuePage() {
           {loadingServices ? (
             <div className="flex justify-center py-12">
               <Loader2 className="w-7 h-7 animate-spin text-[#063466]" />
+            </div>
+          ) : services.length === 0 ? (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center space-y-3">
+              <AlertTriangle className="w-7 h-7 text-amber-600 mx-auto" />
+              <p className="text-xs text-amber-900 font-medium">
+                {servicesError || "ไม่พบรายการบริการทันตกรรมในขณะนี้ กรุณากดลองใหม่อีกครั้ง"}
+              </p>
+              <button
+                type="button"
+                onClick={fetchServices}
+                className="px-4 py-2 bg-[#063466] text-white text-xs font-semibold rounded-xl hover:bg-[#05264b] transition-colors cursor-pointer"
+              >
+                ลองใหม่อีกครั้ง
+              </button>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
