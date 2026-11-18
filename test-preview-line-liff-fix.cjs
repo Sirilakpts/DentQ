@@ -54,9 +54,10 @@ runTest("Timeout Safety: 6s/8s timeout protects against infinite 'กำลั�
 
 // Test 4: Dynamic LIFF ID helper supports UAT and Preview domains
 runTest("Environment: getLiffId dynamically supports preview/uat and defaults to NEXT_PUBLIC_LIFF_ID", () => {
+  const liffModule = fs.readFileSync(path.join(__dirname, "src/lib/liff.ts"), "utf8");
   assert(bookPageCode.includes("getLiffId"), "Book page must have getLiffId helper");
-  assert(bookPageCode.includes("NEXT_PUBLIC_LIFF_ID_PREVIEW"), "Must support NEXT_PUBLIC_LIFF_ID_PREVIEW");
-  assert(bookPageCode.includes("process.env.NEXT_PUBLIC_LIFF_ID"), "Must fallback to process.env.NEXT_PUBLIC_LIFF_ID");
+  assert(liffModule.includes("NEXT_PUBLIC_LIFF_ID_PREVIEW"), "Must support NEXT_PUBLIC_LIFF_ID_PREVIEW");
+  assert(liffModule.includes("process.env.NEXT_PUBLIC_LIFF_ID"), "Must fallback to process.env.NEXT_PUBLIC_LIFF_ID");
 });
 
 // Test 5: Error view displays clear error message with retry button

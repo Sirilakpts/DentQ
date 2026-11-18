@@ -30,6 +30,7 @@ import confetti from "canvas-confetti";
 import { formatThaiDate, getBookableDateRange } from "@/lib/utils";
 import { DentalService, SlotAvailability } from "@/lib/types";
 import { DEMO_MOCK_USER } from "@/lib/demo-data";
+import { getLiffId, getLiffRedirectUri } from "@/lib/liff";
 
 // สิทธิการรักษา 5 แบบตามมาตรฐานระบบทันตกรรม DentQ
 const MEDICAL_RIGHTS_OPTIONS = [
@@ -102,25 +103,11 @@ export default function BookQueuePage() {
   const [isLoggingInLine, setIsLoggingInLine] = useState(false);
   const [liffAuthError, setLiffAuthError] = useState<string | null>(null);
 
-  // Helper to determine the appropriate LIFF ID (supporting preview/staging environments)
-  const getLiffId = () => {
-    if (typeof window !== "undefined") {
-      const host = window.location.hostname;
-      if (host.includes("uat") && process.env.NEXT_PUBLIC_LIFF_ID_UAT) {
-        return process.env.NEXT_PUBLIC_LIFF_ID_UAT;
-      }
-      if (host.includes("preview") && process.env.NEXT_PUBLIC_LIFF_ID_PREVIEW) {
-        return process.env.NEXT_PUBLIC_LIFF_ID_PREVIEW;
-      }
-    }
-    return process.env.NEXT_PUBLIC_LIFF_ID;
-  };
-
   const initLiff = async () => {
     const liffId = getLiffId();
     if (!liffId) {
-      console.warn("[LIFF] NEXT_PUBLIC_LIFF_ID not set");
-      setLiffAuthError("ยังไม่ได้กำหนดค่า NEXT_PUBLIC_LIFF_ID ในระบบ (ท่านสามารถกดเข้าสู่ระบบด้วยบัญชีจำลอง Demo เพื่อทดสอบได้ทันที)");
+      console.warn("[LIFF] LIFF ID not set");
+      setLiffAuthError("ยังไม่ได้กำหนดค่า LIFF ID สำหรับสภาพแวดล้อมนี้ในระบบ (ท่านสามารถกดเข้าสู่ระบบด้วยบัญชีจำลอง Demo เพื่อทดสอบได้ทันที)");
       return;
     }
     if (typeof window === "undefined" || !(window as any).liff) {
@@ -138,7 +125,8 @@ export default function BookQueuePage() {
       setLiffInitialized(true);
       setLiffAuthError(null);
 
-      // ตรวจสอบ liff.state กรณี Rich Menu หรือ LINE ส่งต่อไปยังหน้า /tracking
+      // สำคัญ: ต้องรอ liff.init() ให้เสร็จสมบูรณ์ก่อน เพื่อให้ LIFF SDK ประมวลผล OAuth callback
+      // จากนั้นจึงตรวจสอบ liff.state เพื่อเปลี่ยนเส้นทางอย่างปลอดภัย
       if (typeof window !== "undefined") {
         const search = window.location.search;
         if (search) {
@@ -173,31 +161,15 @@ export default function BookQueuePage() {
       console.warn("[LIFF Init Error]:", err);
       setLiffInitialized(false);
       setLiffAuthError(
-        "ไม่สามารถเชื่อมต่อกับระบบ LINE ได้ (LIFF ID ปัจจุบันอาจยังไม่ได้ผูก Endpoint กับโดเมนนี้ใน LINE Developers หรือเครือข่ายขัดข้อง) ท่านสามารถกดลองใหม่ หรือใช้บัญชีจำลองเพื่อทดสอบได้ทันที"
+        "ไม่สามารถเชื่อมต่อกับระบบ LINE ได้ (LIFF ID หรือ Endpoint อาจไม่ตรงกับที่ลงทะเบียนใน LINE Developers) ท่านสามารถกดลองใหม่ หรือใช้บัญชีจำลองเพื่อทดสอบได้ทันที"
       );
     }
   };
 
-  // Auto-init LIFF if SDK script is already present on window or handle liff.state
+  // Auto-init LIFF if SDK script is already present on window
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const search = window.location.search;
-      if (search) {
-        const params = new URLSearchParams(search);
-        const liffState = params.get("liff.state") || params.get("liffState") || params.get("path");
-        if (liffState) {
-          const decoded = decodeURIComponent(liffState);
-          if (decoded.includes("tracking")) {
-            const dest = decoded.startsWith("/") ? decoded : `/${decoded}`;
-            window.location.replace(dest);
-            return;
-          }
-        }
-      }
-
-      if ((window as any).liff) {
-        initLiff();
-      }
+    if (typeof window !== "undefined" && (window as any).liff) {
+      initLiff();
     }
   }, []);
 
@@ -220,7 +192,7 @@ export default function BookQueuePage() {
 
       const liffId = getLiffId();
       if (!liffId) {
-        throw new Error("ยังไม่ได้กำหนดค่า NEXT_PUBLIC_LIFF_ID ในระบบ");
+        throw new Error("ยังไม่ได้กำหนดค่า LIFF ID สำหรับสภาพแวดล้อมนี้ในระบบ");
       }
 
       // หากยังไม่ได้ Init สำเร็จ ให้พยายาม Init ก่อน Login พร้อม Timeout
@@ -234,7 +206,23 @@ export default function BookQueuePage() {
         setLiffInitialized(true);
       }
 
-      const redirectUri = window.location.origin + "/book";
+      // ภายใน LINE In-App Browser: ผู้ใช้ยืนยันตัวตนอยู่แล้ว ห้ามเรียก liff.login() ซ้ำเด็ดขาด เพราะจะเกิด 400 Bad Request
+      if (liff.isInClient && liff.isInClient()) {
+        if (liff.isLoggedIn()) {
+          const idToken = liff.getIDToken();
+          if (idToken) {
+            setLineIdToken(idToken);
+            const profile = await liff.getProfile();
+            setLineProfile(profile);
+            clearTimeout(safetyTimer);
+            setIsLoggingInLine(false);
+            return;
+          }
+        }
+      }
+
+      // กรณี External Browser: สร้าง redirectUri ที่ตรงกับ Endpoint ที่ลงทะเบียนใน LINE Developers เสมอ
+      const redirectUri = getLiffRedirectUri("/book");
 
       if (!liff.isLoggedIn()) {
         liff.login({ redirectUri });
