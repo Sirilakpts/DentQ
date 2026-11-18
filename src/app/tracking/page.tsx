@@ -52,11 +52,26 @@ function TrackingContent() {
   const [actionLoading, setActionLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  // Helper to determine the appropriate LIFF ID (supporting preview/staging environments)
+  const getLiffId = () => {
+    if (typeof window !== "undefined") {
+      const host = window.location.hostname;
+      if (host.includes("uat") && process.env.NEXT_PUBLIC_LIFF_ID_UAT) {
+        return process.env.NEXT_PUBLIC_LIFF_ID_UAT;
+      }
+      if (host.includes("preview") && process.env.NEXT_PUBLIC_LIFF_ID_PREVIEW) {
+        return process.env.NEXT_PUBLIC_LIFF_ID_PREVIEW;
+      }
+    }
+    return process.env.NEXT_PUBLIC_LIFF_ID;
+  };
+
   // 1. Initialize LIFF SDK
   const initLiff = async () => {
-    const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
+    const liffId = getLiffId();
     if (!liffId) {
       console.warn("[LIFF] NEXT_PUBLIC_LIFF_ID not set");
+      setLiffAuthError("ยังไม่ได้กำหนดค่า NEXT_PUBLIC_LIFF_ID ในระบบ (ท่านสามารถกดเข้าสู่ระบบด้วยบัญชีจำลอง Demo เพื่อทดสอบได้ทันที)");
       return;
     }
     if (typeof window === "undefined" || !(window as any).liff) {
@@ -64,8 +79,15 @@ function TrackingContent() {
     }
     try {
       const liff = (window as any).liff;
-      await liff.init({ liffId });
+      // เพิ่ม Timeout 6 วินาที ป้องกันการค้างกรณีเครือข่ายหรือ Endpoint mismatch
+      await Promise.race([
+        liff.init({ liffId }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("การเชื่อมต่อระบบ LINE หมดเวลา (Timeout)")), 6000)
+        ),
+      ]);
       setLiffInitialized(true);
+      setLiffAuthError(null);
 
       // ตรวจสอบ liff.state กรณีส่งต่อไปยัง /book
       if (typeof window !== "undefined") {
@@ -99,7 +121,10 @@ function TrackingContent() {
       }
     } catch (err: any) {
       console.warn("[LIFF Init Error]:", err);
-      setLiffAuthError("ไม่สามารถเชื่อมต่อกับระบบ LINE ได้ กรุณาลองใหม่อีกครั้ง");
+      setLiffInitialized(false);
+      setLiffAuthError(
+        "ไม่สามารถเชื่อมต่อกับระบบ LINE ได้ (LIFF ID ปัจจุบันอาจยังไม่ได้ผูก Endpoint กับโดเมนนี้ใน LINE Developers หรือเครือข่ายขัดข้อง) ท่านสามารถกดลองใหม่ หรือใช้บัญชีจำลองเพื่อทดสอบได้ทันที"
+      );
     }
   };
 
@@ -125,30 +150,68 @@ function TrackingContent() {
     }
   }, []);
 
-  const handleLineLogin = () => {
-    if (typeof window !== "undefined" && (window as any).liff) {
-      const liff = (window as any).liff;
+  const handleLineLogin = async () => {
+    if (typeof window !== "undefined") {
       setIsLoggingInLine(true);
       setLiffAuthError(null);
-      const redirectUri = window.location.origin + "/tracking" + (queueFilter ? `?q=${encodeURIComponent(queueFilter)}` : "");
 
-      if (!liff.isLoggedIn()) {
-        liff.login({ redirectUri });
-      } else {
-        const idToken = liff.getIDToken();
-        if (!idToken) {
-          liff.logout();
+      // Safety timeout: รีเซ็ตสถานะ loading หากเบราว์เซอร์ไม่ Redirect ภายใน 8 วินาที
+      const safetyTimer = setTimeout(() => {
+        setIsLoggingInLine(false);
+        setLiffAuthError("การเชื่อมต่อ LINE ใช้เวลานานเกินไป กรุณากดลองใหม่อีกครั้ง หรือเข้าสู่ระบบด้วยบัญชีจำลอง");
+      }, 8000);
+
+      try {
+        const liff = (window as any).liff;
+        if (!liff) {
+          throw new Error("SDK ระบบ LINE ยังโหลดไม่เสร็จสมบูรณ์ กรุณารอสักครู่แล้วกดลองใหม่อีกครั้ง");
+        }
+
+        const liffId = getLiffId();
+        if (!liffId) {
+          throw new Error("ยังไม่ได้กำหนดค่า NEXT_PUBLIC_LIFF_ID ในระบบ");
+        }
+
+        if (!liffInitialized) {
+          await Promise.race([
+            liff.init({ liffId }),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error("การเชื่อมต่อระบบ LINE หมดเวลา (Timeout)")), 6000)
+            ),
+          ]);
+          setLiffInitialized(true);
+        }
+
+        const redirectUri = window.location.origin + "/tracking" + (queueFilter ? `?q=${encodeURIComponent(queueFilter)}` : "");
+
+        if (!liff.isLoggedIn()) {
           liff.login({ redirectUri });
         } else {
-          setLineIdToken(idToken);
-          liff.getProfile().then((profile: any) => {
-            setLineProfile(profile);
-            setIsLoggingInLine(false);
-          }).catch(() => {
+          const idToken = liff.getIDToken();
+          if (!idToken) {
             liff.logout();
             liff.login({ redirectUri });
-          });
+          } else {
+            setLineIdToken(idToken);
+            try {
+              const profile = await liff.getProfile();
+              setLineProfile(profile);
+              clearTimeout(safetyTimer);
+              setIsLoggingInLine(false);
+            } catch (profErr: any) {
+              console.warn("[LIFF Profile Error]:", profErr);
+              liff.logout();
+              liff.login({ redirectUri });
+            }
+          }
         }
+      } catch (err: any) {
+        clearTimeout(safetyTimer);
+        console.warn("[LINE Login Error]:", err);
+        setIsLoggingInLine(false);
+        setLiffAuthError(
+          err?.message || "ไม่สามารถเชื่อมต่อกับ LINE ได้ กรุณาลองใหม่อีกครั้ง หรือใช้บัญชีจำลองเพื่อทดสอบ"
+        );
       }
     }
   };
@@ -352,9 +415,24 @@ function TrackingContent() {
 
           {/* Error Message when LINE Auth fails or token expires */}
           {(liffAuthError || fetchError) && (
-            <div className="bg-rose-50 border border-rose-200/80 rounded-2xl p-3 text-left text-xs text-rose-800 flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-              <span>{liffAuthError || fetchError}</span>
+            <div className="bg-rose-50 border border-rose-200/80 rounded-2xl p-3.5 text-left text-xs text-rose-800 space-y-2">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <span className="flex-1 leading-relaxed">{liffAuthError || fetchError}</span>
+              </div>
+              <div className="flex justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLiffAuthError(null);
+                    setFetchError(null);
+                    handleLineLogin();
+                  }}
+                  className="px-3 py-1 bg-white border border-rose-300 rounded-lg text-rose-700 font-semibold text-xs hover:bg-rose-100 transition-colors cursor-pointer"
+                >
+                  ลองใหม่อีกครั้ง
+                </button>
+              </div>
             </div>
           )}
 
@@ -362,7 +440,7 @@ function TrackingContent() {
           <div className="pt-1 space-y-3">
             <button
               type="button"
-              disabled={isLoggingInLine || (!liffInitialized && typeof window !== "undefined" && !(window as any).liff)}
+              disabled={isLoggingInLine}
               onClick={handleLineLogin}
               className="w-full h-12 inline-flex items-center justify-center gap-2.5 px-6 rounded-2xl text-sm font-bold text-white bg-[#06C755] hover:bg-[#05b34c] shadow-sm hover:shadow transition-all cursor-pointer disabled:opacity-60"
             >
@@ -380,7 +458,9 @@ function TrackingContent() {
             </button>
 
             {/* Demo Account Button for Browser Reviewers */}
-            {(process.env.NEXT_PUBLIC_DEMO_MODE === "true" || process.env.NODE_ENV === "development") && (
+            {(process.env.NEXT_PUBLIC_DEMO_MODE === "true" ||
+              process.env.NODE_ENV === "development" ||
+              (typeof window !== "undefined" && window.location.hostname.includes("vercel.app"))) && (
               <div className="pt-2 space-y-2">
                 <div className="relative flex py-1 items-center">
                   <div className="flex-grow border-t border-slate-200" />
@@ -393,6 +473,9 @@ function TrackingContent() {
                 <button
                   type="button"
                   onClick={() => {
+                    setIsLoggingInLine(false);
+                    setLiffAuthError(null);
+                    setFetchError(null);
                     setLineProfile({
                       userId: DEMO_MOCK_USER.userId,
                       displayName: DEMO_MOCK_USER.displayName,
