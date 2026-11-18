@@ -91,9 +91,23 @@ function getSheetsClient() {
     throw new Error("Google Sheets access is blocked in Demo Mode");
   }
 
-  const spreadsheetId =
+  let rawSpreadsheetId =
     process.env.GOOGLE_SHEETS_UAT_SPREADSHEET_ID?.trim() ||
-    process.env.GOOGLE_SHEETS_SPREADSHEET_ID?.trim();
+    process.env.GOOGLE_SHEETS_SPREADSHEET_ID?.trim() ||
+    "";
+
+  // Strip surrounding quotes
+  rawSpreadsheetId = rawSpreadsheetId.replace(/^["']|["']$/g, "").trim();
+
+  // Extract ID if full Google Sheets URL was pasted
+  if (rawSpreadsheetId.includes("/d/")) {
+    const match = rawSpreadsheetId.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    if (match) {
+      rawSpreadsheetId = match[1];
+    }
+  }
+
+  const spreadsheetId = rawSpreadsheetId;
 
   if (!spreadsheetId) {
     throw new Error("Missing GOOGLE_SHEETS_SPREADSHEET_ID in environment variables");
@@ -112,7 +126,14 @@ function getSheetsClient() {
   if (serviceAccountKeyJson && serviceAccountKeyJson.trim()) {
     try {
       let rawJson = serviceAccountKeyJson.trim();
-      if (!rawJson.startsWith("{") && rawJson.length > 20) {
+      // Remove surrounding quotes if pasted as "{\"type\": ...}"
+      if (
+        (rawJson.startsWith('"') && rawJson.endsWith('"')) ||
+        (rawJson.startsWith("'") && rawJson.endsWith("'"))
+      ) {
+        rawJson = rawJson.slice(1, -1);
+      }
+      if (rawJson && !rawJson.startsWith("{") && rawJson.length > 20) {
         rawJson = Buffer.from(rawJson, "base64").toString("utf-8");
       }
       authOptions.credentials = JSON.parse(rawJson);
@@ -133,6 +154,14 @@ function getSheetsClient() {
     // Fail Closed เมื่อไม่มี Credentials ครบถ้วน
     throw new Error(
       "Missing Google Service Account credentials. Set GOOGLE_SERVICE_ACCOUNT_KEY (JSON), GOOGLE_SERVICE_ACCOUNT_EMAIL + GOOGLE_PRIVATE_KEY, or GOOGLE_APPLICATION_CREDENTIALS."
+    );
+  }
+
+  // ปรับ private_key ให้แทนที่ literal \n เป็น newline จริงเสมอ ป้องกัน PEM routines error บน Vercel
+  if (authOptions.credentials?.private_key) {
+    authOptions.credentials.private_key = authOptions.credentials.private_key.replace(
+      /\\n/g,
+      "\n"
     );
   }
 
@@ -321,10 +350,27 @@ export async function getAllBookingsFromSheet(): Promise<SheetBookingRecord[]> {
   try {
     const { sheets, spreadsheetId } = getSheetsClient();
 
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: "Bookings!A2:M",
-    });
+    let response;
+    try {
+      response = await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: "Bookings!A2:M",
+      });
+    } catch (rangeErr: any) {
+      const msg = String(rangeErr?.message || "");
+      if (
+        msg.includes("Unable to parse range") ||
+        msg.includes("Bookings")
+      ) {
+        console.warn("[Google Sheets] Tab 'Bookings' not found, trying default range 'A2:M':", msg);
+        response = await sheets.spreadsheets.values.get({
+          spreadsheetId,
+          range: "A2:M",
+        });
+      } else {
+        throw rangeErr;
+      }
+    }
 
     const rows = response.data.values || [];
     return rows

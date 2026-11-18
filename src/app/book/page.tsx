@@ -25,6 +25,7 @@ import {
   Loader2,
   LogOut,
   HeartPulse,
+  RefreshCw,
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import { formatThaiDate, getBookableDateRange } from "@/lib/utils";
@@ -78,6 +79,7 @@ export default function BookQueuePage() {
   const [slotPeriod, setSlotPeriod] = useState<"ALL" | "MORNING" | "AFTERNOON">("ALL");
   const [slots, setSlots] = useState<SlotAvailability[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [slotsError, setSlotsError] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<SlotAvailability | null>(null);
 
   // Patient Info & Medical Rights
@@ -297,27 +299,35 @@ export default function BookQueuePage() {
     fetchServices();
   }, []);
 
-  // 2. Fetch Slots whenever selectedDate changes
-  useEffect(() => {
+  // 2. Fetch Slots whenever selectedDate or selectedService changes
+  const fetchSlots = async () => {
     if (!selectedDate) return;
 
-    async function fetchSlots() {
-      try {
-        setLoadingSlots(true);
-        setSelectedSlot(null);
-        const res = await fetch(`/api/slots?date=${selectedDate}`);
-        const data = await res.json();
-        if (data.success) {
-          setSlots(data.slots);
-        }
-      } catch (err) {
-        console.error("Failed to fetch slots:", err);
-      } finally {
-        setLoadingSlots(false);
+    try {
+      setLoadingSlots(true);
+      setSlotsError(null);
+      setSelectedSlot(null);
+      const serviceParam = selectedService ? `&serviceId=${encodeURIComponent(selectedService.id)}` : "";
+      const res = await fetch(`/api/slots?date=${encodeURIComponent(selectedDate)}${serviceParam}`);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.slots)) {
+        setSlots(data.slots);
+        setSlotsError(null);
+      } else {
+        throw new Error(data.error || "ไม่สามารถดึงข้อมูลช่วงเวลาว่างได้");
       }
+    } catch (err: any) {
+      console.error("Failed to fetch slots:", err);
+      setSlots([]); // ห้ามแสดงสล็อตเป็นว่างทั้งหมดโดยเดาว่าไม่มีคนจอง
+      setSlotsError(err?.message || "ไม่สามารถเชื่อมต่อระบบตรวจสอบเวลาว่างได้ กรุณากดลองใหม่อีกครั้ง");
+    } finally {
+      setLoadingSlots(false);
     }
+  };
+
+  useEffect(() => {
     fetchSlots();
-  }, [selectedDate]);
+  }, [selectedDate, selectedService?.id]);
 
   // Handle Booking Submit
   async function handleBookingSubmit(e: React.FormEvent) {
@@ -970,6 +980,32 @@ export default function BookQueuePage() {
           {loadingSlots ? (
             <div className="flex justify-center py-12">
               <Loader2 className="w-7 h-7 animate-spin text-[#063466]" />
+            </div>
+          ) : slotsError ? (
+            <div className="bg-amber-50 border border-amber-200/90 rounded-2xl p-5 text-center space-y-3">
+              <AlertTriangle className="w-7 h-7 text-amber-600 mx-auto" />
+              <div className="space-y-1">
+                <p className="text-sm font-bold text-amber-900">
+                  ไม่สามารถโหลดช่วงเวลานัดหมายได้
+                </p>
+                <p className="text-xs text-amber-800 max-w-md mx-auto leading-relaxed">
+                  {slotsError}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={fetchSlots}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-[#063466] hover:bg-[#05264b] transition-all cursor-pointer shadow-xs"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>ลองโหลดช่วงเวลาใหม่อีกครั้ง</span>
+              </button>
+            </div>
+          ) : filteredSlots.length === 0 ? (
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 text-center space-y-2">
+              <p className="text-xs text-slate-500">
+                ไม่มีสล็อตเวลาที่ตรงกับตัวกรองที่เลือก กรุณาเลือกตัวกรอง &quot;ทั้งหมด&quot; หรือเลือกวันอื่น
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 sm:gap-3">

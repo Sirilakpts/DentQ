@@ -64,21 +64,25 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: true, slots, isDemo: true });
     }
 
-    // 1. Fetch any explicit slot configs from Prisma (Dependency: SlotConfig ที่ไม่ใช่ Booking)
-    const slotConfigs = await prisma.slotConfig
-      .findMany({
-        where: { date },
-      })
-      .catch(() => []);
-    const configMap = new Map(slotConfigs.map((c) => [c.time, c]));
-
     // Feature Flag: BOOKING_STORAGE (sqlite | sheets, default: sqlite)
     const bookingStorage = (process.env.BOOKING_STORAGE || "sqlite").toLowerCase();
+
+    // 1. Fetch any explicit slot configs from Prisma เฉพาะเมื่ออยู่ในโหมด sqlite
+    let slotConfigs: any[] = [];
+    if (bookingStorage !== "sheets") {
+      slotConfigs = await prisma.slotConfig
+        .findMany({
+          where: { date: date.trim() },
+        })
+        .catch(() => []);
+    }
+    const configMap = new Map(slotConfigs.map((c) => [c.time, c]));
 
     const bookingCountMap = new Map<string, number>();
     let isProcedureQuotaFull = false;
     let isMorningQuotaFull = false;
     let morningActiveCount = 0;
+    const targetDate = date.trim();
 
     // ==========================================
     // Mode 1: Google Sheets Mode
@@ -89,7 +93,8 @@ export async function GET(req: NextRequest) {
 
         // กรองเฉพาะวันที่ระบุ และไม่นับข้อมูลทดสอบ (ขึ้นต้นด้วย TEST- หรือ DQ-TEST-)
         const dateBookings = allBookings.filter((b) => {
-          if (b.bookingDate !== date) return false;
+          const bDate = (b.bookingDate || "").split("T")[0].trim();
+          if (bDate !== targetDate) return false;
           const upperId = b.bookingId.toUpperCase();
           if (
             upperId.startsWith("TEST-") ||
