@@ -152,6 +152,11 @@ node .\test-login-gate-stepui6.cjs
 node .\test-public-polish-stepui7.cjs
 ```
 
+รันสคริปต์ทดสอบ Restore Login to Booking Flow (Step LINE Fix 1):
+```powershell
+node .\test-line-login-fix-step1.cjs
+```
+
 ---
 
 ## 3. วิธีทดสอบ API Endpoint
@@ -260,3 +265,16 @@ Invoke-RestMethod -Uri http://localhost:3000/api/test-sheets
   - การแจ้งเตือนนัดหมายล่วงหน้าผ่าน Cron (`/api/cron/reminders`)
 
 *หมายเหตุ:* หลังเปลี่ยนค่าใน `.env` ต้องรีสตาร์ต Next.js Dev Server เสมอ (`npm run dev`)
+
+---
+
+## 9. แนวทางการทดสอบระบบจำลองการทำงานจริง (UAT Mode)
+สำหรับการทดสอบการทำงานครบวงจรผ่าน LINE จริง, Google Sheets ทดสอบ, Admin และ LINE Notifications:
+1. **Google Sheets Test Spreadsheet:** ตั้งค่า `GOOGLE_SHEETS_UAT_SPREADSHEET_ID` แยกจากชีตข้อมูลจริง
+2. **Serverless Credentials:** รองรับ `GOOGLE_SERVICE_ACCOUNT_KEY` (JSON string) บน Vercel
+3. **LINE Allowlist:** ตั้งค่า `LINE_NOTIF_ALLOWLIST=Uxxx,Uyyy` กำหนดเฉพาะ User ID ของผู้ทดสอบเพื่อความปลอดภัย
+4. **Admin Authentication:** ป้องกันการเข้าถึงชีตด้วย `demo_token` โดยบังคับเข้าสู่ระบบผ่าน `/login` ด้วยรหัสผ่าน
+5. **รันการทดสอบระบบ UAT อัตโนมัติ:**
+   ```bash
+   node .\test-uat-system-verification.cjs
+   ```

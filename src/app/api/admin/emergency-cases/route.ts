@@ -1,15 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isDemoMode } from "@/lib/demo-data";
+import { verifyAdminSessionToken } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 /**
  * GET: Fetch pending emergency cases from LINE SOS
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
   if (isDemoMode()) {
     return NextResponse.json({ success: true, cases: [], isDemo: true });
+  }
+
+  const adminSession = req.cookies.get("admin_session")?.value;
+  const authCheck = verifyAdminSessionToken(adminSession, false);
+  if (!authCheck.valid) {
+    return NextResponse.json(
+      { success: false, error: "Unauthorized: กรุณาเข้าสู่ระบบในฐานะผู้ดูแลระบบ" },
+      { status: 401 }
+    );
   }
 
   try {
@@ -36,6 +46,15 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json(
       { success: false, error: "Emergency management is disabled in Demo Mode" },
       { status: 403 }
+    );
+  }
+
+  const adminSession = req.cookies.get("admin_session")?.value;
+  const authCheck = verifyAdminSessionToken(adminSession, false);
+  if (!authCheck.valid) {
+    return NextResponse.json(
+      { success: false, error: "Unauthorized: กรุณาเข้าสู่ระบบในฐานะผู้ดูแลระบบ" },
+      { status: 401 }
     );
   }
 

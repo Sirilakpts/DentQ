@@ -100,6 +100,7 @@ export default function BookQueuePage() {
   } | null>(null);
   const [lineIdToken, setLineIdToken] = useState<string | null>(null);
   const [isLoggingInLine, setIsLoggingInLine] = useState(false);
+  const [liffAuthError, setLiffAuthError] = useState<string | null>(null);
 
   const initLiff = async () => {
     const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
@@ -114,23 +115,92 @@ export default function BookQueuePage() {
       const liff = (window as any).liff;
       await liff.init({ liffId });
       setLiffInitialized(true);
+
+      // ตรวจสอบ liff.state กรณี Rich Menu หรือ LINE ส่งต่อไปยังหน้า /tracking
+      if (typeof window !== "undefined") {
+        const search = window.location.search;
+        if (search) {
+          const params = new URLSearchParams(search);
+          const liffState = params.get("liff.state") || params.get("liffState") || params.get("path");
+          if (liffState) {
+            const decoded = decodeURIComponent(liffState);
+            if (decoded.includes("tracking")) {
+              const dest = decoded.startsWith("/") ? decoded : `/${decoded}`;
+              window.location.replace(dest);
+              return;
+            }
+          }
+        }
+      }
+
       if (liff.isLoggedIn()) {
         const idToken = liff.getIDToken();
-        setLineIdToken(idToken);
-        const profile = await liff.getProfile();
-        setLineProfile(profile);
+        if (idToken) {
+          setLineIdToken(idToken);
+          const profile = await liff.getProfile();
+          setLineProfile(profile);
+          setLiffAuthError(null);
+        } else {
+          // มี session เก่าแต่ Token หมดอายุหรือไม่ได้รับ openid scope
+          setLineIdToken(null);
+          setLineProfile(null);
+          setLiffAuthError("การเข้าสู่ระบบ LINE หมดอายุ กรุณากดเข้าสู่ระบบใหม่อีกครั้ง");
+        }
       }
     } catch (err: any) {
       console.warn("[LIFF Init Error]:", err);
+      setLiffAuthError("ไม่สามารถเชื่อมต่อกับระบบ LINE ได้ กรุณาลองใหม่อีกครั้ง");
     }
   };
+
+  // Auto-init LIFF if SDK script is already present on window or handle liff.state
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const search = window.location.search;
+      if (search) {
+        const params = new URLSearchParams(search);
+        const liffState = params.get("liff.state") || params.get("liffState") || params.get("path");
+        if (liffState) {
+          const decoded = decodeURIComponent(liffState);
+          if (decoded.includes("tracking")) {
+            const dest = decoded.startsWith("/") ? decoded : `/${decoded}`;
+            window.location.replace(dest);
+            return;
+          }
+        }
+      }
+
+      if ((window as any).liff) {
+        initLiff();
+      }
+    }
+  }, []);
 
   const handleLineLogin = () => {
     if (typeof window !== "undefined" && (window as any).liff) {
       const liff = (window as any).liff;
+      setIsLoggingInLine(true);
+      setLiffAuthError(null);
+      const redirectUri = window.location.origin + "/book";
+
       if (!liff.isLoggedIn()) {
-        setIsLoggingInLine(true);
-        liff.login();
+        liff.login({ redirectUri });
+      } else {
+        const idToken = liff.getIDToken();
+        if (!idToken) {
+          // Token หมดอายุหรือ null: ทำการ logout และ login ใหม่เพื่อให้ได้ Token สด
+          liff.logout();
+          liff.login({ redirectUri });
+        } else {
+          setLineIdToken(idToken);
+          liff.getProfile().then((profile: any) => {
+            setLineProfile(profile);
+            setIsLoggingInLine(false);
+          }).catch(() => {
+            liff.logout();
+            liff.login({ redirectUri });
+          });
+        }
       }
     }
   };
@@ -144,6 +214,7 @@ export default function BookQueuePage() {
     }
     setLineProfile(null);
     setLineIdToken(null);
+    setLiffAuthError(null);
     setStep(1);
     setSelectedService(null);
     setSelectedSlot(null);
@@ -241,6 +312,11 @@ export default function BookQueuePage() {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
+        if (res.status === 401) {
+          setLineIdToken(null);
+          setLineProfile(null);
+          setLiffAuthError(data.error || "การเข้าสู่ระบบ LINE หมดอายุ กรุณาเข้าสู่ระบบใหม่อีกครั้ง");
+        }
         throw new Error(data.error || "ไม่สามารถจองคิวได้ กรุณาลองใหม่อีกครั้ง");
       }
 
@@ -328,12 +404,20 @@ export default function BookQueuePage() {
             </p>
           </div>
 
+          {/* Error Message when LINE Auth fails or token expires */}
+          {liffAuthError && (
+            <div className="bg-rose-50 border border-rose-200/80 rounded-2xl p-3 text-left text-xs text-rose-800 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <span>{liffAuthError}</span>
+            </div>
+          )}
+
           {/* Action Area */}
           <div className="space-y-3 pt-1">
             {/* Primary Action Button: เข้าสู่ระบบด้วย LINE */}
             <button
               type="button"
-              disabled={isLoggingInLine || !liffInitialized}
+              disabled={isLoggingInLine || (!liffInitialized && typeof window !== "undefined" && !(window as any).liff)}
               onClick={handleLineLogin}
               className="w-full h-12 inline-flex items-center justify-center gap-2.5 px-6 rounded-2xl text-sm font-bold text-white bg-[#06C755] hover:bg-[#05b34c] shadow-sm hover:shadow transition-all cursor-pointer disabled:opacity-60"
             >
@@ -1146,7 +1230,7 @@ export default function BookQueuePage() {
                 <span>⏳ รอเจ้าหน้าที่ตรวจสอบ (PENDING)</span>
               </div>
 
-              {(process.env.NEXT_PUBLIC_DEMO_MODE === "true" || lineProfile?.userId === DEMO_MOCK_USER.userId) && (
+              {(createdBooking?.isDemo || process.env.NEXT_PUBLIC_DEMO_MODE === "true" || lineProfile?.userId === DEMO_MOCK_USER.userId) && (
                 <div className="mt-2 text-[10px] text-amber-200 bg-white/10 rounded-lg py-1 px-3 inline-block">
                   ⚠️ คิวจำลองเพื่อการสาธิต (Demo) — ไม่บันทึกถาวร
                 </div>

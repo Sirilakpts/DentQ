@@ -831,6 +831,38 @@ export function buildAdvanceReminderFlexMessage(booking: {
 }
 
 /**
+ * ตรวจสอบว่า recipient (LINE User ID) อยู่ใน Allowlist สำหรับการส่งข้อความจริงหรือไม่
+ * ในโหมด UAT/ทดสอบ: บังคับส่งเฉพาะบัญชีที่ระบุใน LINE_NOTIF_ALLOWLIST หรือ UAT_LINE_ALLOWLIST
+ * เพื่อป้องกันการส่งข้อความรบกวนประชาชนหรือผู้ป่วยจริงโดยไม่ตั้งใจ
+ */
+export function isLineRecipientAllowlisted(recipient: string): boolean {
+  if (!recipient || !recipient.trim()) return false;
+  if (recipient.startsWith("08") || recipient.startsWith("09") || recipient.startsWith("U_demo_")) {
+    return false;
+  }
+
+  const allowlistEnv =
+    process.env.LINE_NOTIF_ALLOWLIST || process.env.UAT_LINE_ALLOWLIST;
+
+  // หากไม่มีการกำหนด Allowlist ในสิ่งแวดล้อม: Fail-Safe บล็อกการส่งข้อความจริงทั้งหมด
+  if (!allowlistEnv || !allowlistEnv.trim()) {
+    return false;
+  }
+
+  // หากระบุเป็น "*" จึงจะอนุญาตทุกบัญชี
+  if (allowlistEnv.trim() === "*") {
+    return true;
+  }
+
+  const allowed = allowlistEnv
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+
+  return allowed.includes(recipient.trim().toLowerCase());
+}
+
+/**
  * Dispatch LINE Flex Message:
  * 1. If LINE_CHANNEL_ACCESS_TOKEN is set and recipient has lineUserId, sends actual HTTP request to LINE Messaging API.
  * 2. In all cases, persists the message in NotificationLog for staff audit and UI preview.
@@ -845,7 +877,14 @@ export async function sendLineFlexNotification(params: {
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
   let status = "SIMULATED";
 
-  if (token && params.recipient && !params.recipient.startsWith("08") && !params.recipient.startsWith("09")) {
+  const isAllowlisted = isLineRecipientAllowlisted(params.recipient);
+
+  if (!isAllowlisted) {
+    console.log(
+      `[LINE Safe Guard] Recipient '${params.recipient}' is not in LINE_NOTIF_ALLOWLIST. Message push simulated.`
+    );
+    status = "SIMULATED_NOT_IN_ALLOWLIST";
+  } else if (token && params.recipient && !params.recipient.startsWith("08") && !params.recipient.startsWith("09")) {
     try {
       const res = await fetch("https://api.line.me/v2/bot/message/push", {
         method: "POST",

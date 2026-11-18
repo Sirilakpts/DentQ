@@ -21,6 +21,7 @@ import {
   DEMO_SERVICES,
   DEMO_MOCK_USER,
 } from "@/lib/demo-data";
+import { verifyAdminSessionToken, isUatUserAllowlisted } from "@/lib/auth";
 
 const bookingSchema = z.object({
   serviceId: z.string().min(1, "กรุณาเลือกบริการทันตกรรม"),
@@ -386,6 +387,19 @@ export async function GET(req: NextRequest) {
     }
 
     if (bookingStorage === "sheets") {
+      // ตรวจสอบสิทธิ์ Admin: ในโหมด Google Sheets ปฏิเสธ demo_token เด็ดขาด
+      const adminSession = req.cookies.get("admin_session")?.value;
+      const authCheck = verifyAdminSessionToken(adminSession, true);
+      if (!authCheck.valid) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: authCheck.error || "Unauthorized: กรุณาเข้าสู่ระบบในฐานะผู้ดูแลระบบเพื่อดูข้อมูล",
+          },
+          { status: 401 }
+        );
+      }
+
       let sheetBookings: SheetBookingRecord[] = [];
       try {
         sheetBookings = await getAllBookingsFromSheet();
@@ -646,6 +660,8 @@ export async function POST(req: NextRequest) {
         createdAt: now,
         updatedAt: now,
         service: selectedService,
+        lineUserId: verifiedLineUserId,
+        isDemo: true,
       };
 
       console.log(
@@ -667,6 +683,17 @@ export async function POST(req: NextRequest) {
     // Mode 1: Google Sheets Mode (Demo Storage)
     // ==========================================
     if (bookingStorage === "sheets") {
+      // ตรวจสอบ UAT Allowlist ฝั่ง Server: ห้ามบุคคลนอก Allowlist สร้างการจองคิวในโหมด UAT Google Sheets
+      if (!isUatUserAllowlisted(verifiedLineUserId)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "ขออภัย ระบบเปิดรับการจองคิวเฉพาะบัญชีผู้ทดสอบที่ได้รับอนุญาตเท่านั้น (UAT Restricted)",
+          },
+          { status: 403 }
+        );
+      }
+
       // ป้องกัน Race Condition ในการจองคิวพร้อมกันภายใน Node.js Process ด้วย In-Process Mutex
       const sheetBookingResult = await bookingSheetsMutex.runExclusive(async () => {
         // 1. ตรวจสอบบริการทันตกรรมที่เลือก
@@ -695,6 +722,20 @@ export async function POST(req: NextRequest) {
 
         // กรองเฉพาะวันที่ระบุ
         const dateBookings = allSheetBookings.filter((b) => b.bookingDate === validated.date);
+
+        // 3.1 ป้องกันการจองซ้ำ: ตรวจสอบว่าบัญชี LINE เดียวกันมีคิว Active ในวันเดียวกันอยู่แล้วหรือไม่
+        const activeStatuses = ["PENDING", "CONFIRMED", "CHECKED_IN", "IN_PROGRESS"];
+        const existingUserBooking = dateBookings.find(
+          (b) =>
+            b.lineUserId &&
+            b.lineUserId === verifiedLineUserId &&
+            activeStatuses.includes(b.status)
+        );
+        if (existingUserBooking) {
+          throw new Error(
+            `ท่านมีรายการจองคิวในวันที่เลือกอยู่แล้ว (หมายเลขคิว ${existingUserBooking.bookingId}) ไม่สามารถจองซ้ำในวันเดียวกันได้`
+          );
+        }
 
         // 4. ตรวจสอบโควตารอบเช้า (สูงสุด 6 คน รวมทุกบริการ ก่อน 12:00 น.)
         if (isMorningTime(validated.time)) {

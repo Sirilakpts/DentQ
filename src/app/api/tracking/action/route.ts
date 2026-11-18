@@ -7,6 +7,7 @@ import {
 } from "@/lib/google-sheets";
 import { verifyLineIdToken } from "@/lib/lineApi";
 import { isDemoMode, getDemoBookings } from "@/lib/demo-data";
+import { isUatUserAllowlisted } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -120,6 +121,17 @@ export async function POST(req: NextRequest) {
     // Mode 1: Google Sheets Mode
     // ==========================================
     if (bookingStorage === "sheets") {
+      // ตรวจสอบ UAT Allowlist ฝั่ง Server: ป้องกันบุคคลภายนอกจัดการข้อมูลคิวในโหมด UAT Google Sheets
+      if (!isUatUserAllowlisted(verifiedLineUserId)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "ขออภัย ระบบเปิดให้จัดการคิวเฉพาะบัญชีผู้ทดสอบที่ได้รับอนุญาตเท่านั้น (UAT Restricted)",
+          },
+          { status: 403 }
+        );
+      }
+
       try {
         const booking = await getBookingByIdFromSheet(cleanQueueNumber);
 

@@ -14,12 +14,15 @@ import {
   ShieldCheck,
   ChevronRight
 } from "lucide-react";
+import LiffRedirect from "@/components/LiffRedirect";
 
 export default function HomePage() {
   const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
   return (
     <div className="min-h-screen bg-slate-50 bg-[#F5F7FA] flex flex-col justify-between font-sans text-slate-800">
+      {/* ประมวลผล liff.state จาก Rich Menu เพื่อนำทางไปยัง /book หรือ /tracking */}
+      <LiffRedirect />
       <div>
         {/* ========================================================================= */}
         {/* Section 1: Hero Section (Friendly Dental Healthcare + Government Minimal) */}

@@ -91,21 +91,52 @@ function getSheetsClient() {
     throw new Error("Google Sheets access is blocked in Demo Mode");
   }
 
-  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
-  const keyFile = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  const spreadsheetId =
+    process.env.GOOGLE_SHEETS_UAT_SPREADSHEET_ID?.trim() ||
+    process.env.GOOGLE_SHEETS_SPREADSHEET_ID?.trim();
 
   if (!spreadsheetId) {
     throw new Error("Missing GOOGLE_SHEETS_SPREADSHEET_ID in environment variables");
   }
 
-  if (!keyFile) {
-    throw new Error("Missing GOOGLE_APPLICATION_CREDENTIALS in environment variables");
+  // รองรับ Service Account Credentials ผ่าน Environment Variables สำหรับ Vercel Serverless
+  // โดยรองรับทั้ง JSON string, Base64 JSON, แยก EMAIL/PRIVATE_KEY หรือไฟล์ Local
+  const serviceAccountKeyJson =
+    process.env.GOOGLE_SERVICE_ACCOUNT_KEY ||
+    process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+
+  let authOptions: any = {
+    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+  };
+
+  if (serviceAccountKeyJson && serviceAccountKeyJson.trim()) {
+    try {
+      let rawJson = serviceAccountKeyJson.trim();
+      if (!rawJson.startsWith("{") && rawJson.length > 20) {
+        rawJson = Buffer.from(rawJson, "base64").toString("utf-8");
+      }
+      authOptions.credentials = JSON.parse(rawJson);
+    } catch (e: any) {
+      throw new Error(`Invalid JSON format in GOOGLE_SERVICE_ACCOUNT_KEY: ${e.message}`);
+    }
+  } else if (
+    process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL &&
+    process.env.GOOGLE_PRIVATE_KEY
+  ) {
+    authOptions.credentials = {
+      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL.trim(),
+      private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+    };
+  } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    authOptions.keyFile = process.env.GOOGLE_APPLICATION_CREDENTIALS.trim();
+  } else {
+    // Fail Closed เมื่อไม่มี Credentials ครบถ้วน
+    throw new Error(
+      "Missing Google Service Account credentials. Set GOOGLE_SERVICE_ACCOUNT_KEY (JSON), GOOGLE_SERVICE_ACCOUNT_EMAIL + GOOGLE_PRIVATE_KEY, or GOOGLE_APPLICATION_CREDENTIALS."
+    );
   }
 
-  const auth = new google.auth.GoogleAuth({
-    keyFile,
-    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-  });
+  const auth = new google.auth.GoogleAuth(authOptions);
 
   const sheets = google.sheets({
     version: "v4",

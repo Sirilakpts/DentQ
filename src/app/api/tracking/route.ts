@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { findBookingsByLineUserIdFromSheet } from "@/lib/google-sheets";
 import { verifyLineIdToken } from "@/lib/lineApi";
 import { isDemoMode, getDemoBookings } from "@/lib/demo-data";
+import { isUatUserAllowlisted } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -105,6 +106,18 @@ export async function GET(req: NextRequest) {
     // Mode 1: Google Sheets Mode
     // ==========================================
     if (bookingStorage === "sheets") {
+      // ตรวจสอบ UAT Allowlist ฝั่ง Server: ป้องกันบุคคลภายนอกเข้าถึงข้อมูลคิวในโหมด UAT Google Sheets
+      if (!isUatUserAllowlisted(verifiedLineUserId)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "ขออภัย ระบบเปิดให้ตรวจสอบคิวเฉพาะบัญชีผู้ทดสอบที่ได้รับอนุญาตเท่านั้น (UAT Restricted)",
+            bookings: [],
+          },
+          { status: 403 }
+        );
+      }
+
       try {
         // ค้นหาเฉพาะรายการที่ line_user_id ตรงกับ verified LINE User ID
         const userBookings = await findBookingsByLineUserIdFromSheet(

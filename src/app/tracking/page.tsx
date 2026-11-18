@@ -42,6 +42,7 @@ function TrackingContent() {
   } | null>(null);
   const [lineIdToken, setLineIdToken] = useState<string | null>(null);
   const [isLoggingInLine, setIsLoggingInLine] = useState(false);
+  const [liffAuthError, setLiffAuthError] = useState<string | null>(null);
 
   // Data & UI States
   const [loading, setLoading] = useState(false);
@@ -65,23 +66,89 @@ function TrackingContent() {
       const liff = (window as any).liff;
       await liff.init({ liffId });
       setLiffInitialized(true);
+
+      // ตรวจสอบ liff.state กรณีส่งต่อไปยัง /book
+      if (typeof window !== "undefined") {
+        const search = window.location.search;
+        if (search) {
+          const params = new URLSearchParams(search);
+          const liffState = params.get("liff.state") || params.get("liffState") || params.get("path");
+          if (liffState) {
+            const decoded = decodeURIComponent(liffState);
+            if (decoded.startsWith("/book") || decoded === "book") {
+              window.location.replace("/book");
+              return;
+            }
+          }
+        }
+      }
+
       if (liff.isLoggedIn()) {
         const idToken = liff.getIDToken();
-        setLineIdToken(idToken);
-        const profile = await liff.getProfile();
-        setLineProfile(profile);
+        if (idToken) {
+          setLineIdToken(idToken);
+          const profile = await liff.getProfile();
+          setLineProfile(profile);
+          setLiffAuthError(null);
+        } else {
+          // Token หมดอายุหรือไม่ได้รับ idToken
+          setLineIdToken(null);
+          setLineProfile(null);
+          setLiffAuthError("การเข้าสู่ระบบ LINE หมดอายุ กรุณาเข้าสู่ระบบใหม่อีกครั้ง");
+        }
       }
     } catch (err: any) {
       console.warn("[LIFF Init Error]:", err);
+      setLiffAuthError("ไม่สามารถเชื่อมต่อกับระบบ LINE ได้ กรุณาลองใหม่อีกครั้ง");
     }
   };
+
+  // Auto-init LIFF if script is already loaded on window or handle liff.state
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const search = window.location.search;
+      if (search) {
+        const params = new URLSearchParams(search);
+        const liffState = params.get("liff.state") || params.get("liffState") || params.get("path");
+        if (liffState) {
+          const decoded = decodeURIComponent(liffState);
+          if (decoded.startsWith("/book") || decoded === "book") {
+            window.location.replace("/book");
+            return;
+          }
+        }
+      }
+
+      if ((window as any).liff) {
+        initLiff();
+      }
+    }
+  }, []);
 
   const handleLineLogin = () => {
     if (typeof window !== "undefined" && (window as any).liff) {
       const liff = (window as any).liff;
+      setIsLoggingInLine(true);
+      setLiffAuthError(null);
+      const redirectUri = window.location.origin + "/tracking" + (queueFilter ? `?q=${encodeURIComponent(queueFilter)}` : "");
+
       if (!liff.isLoggedIn()) {
-        setIsLoggingInLine(true);
-        liff.login();
+        liff.login({ redirectUri });
+      } else {
+        const idToken = liff.getIDToken();
+        if (!idToken) {
+          liff.logout();
+          liff.login({ redirectUri });
+        } else {
+          setLineIdToken(idToken);
+          liff.getProfile().then((profile: any) => {
+            setLineProfile(profile);
+            setIsLoggingInLine(false);
+          }).catch(() => {
+            liff.logout();
+            liff.login({ redirectUri });
+          });
+        }
       }
     }
   };
@@ -95,6 +162,7 @@ function TrackingContent() {
     }
     setLineProfile(null);
     setLineIdToken(null);
+    setLiffAuthError(null);
     setBookings([]);
     setFetchError(null);
   };
@@ -124,6 +192,9 @@ function TrackingContent() {
 
       if (!res.ok || !data.success) {
         if (res.status === 401) {
+          setLineIdToken(null);
+          setLineProfile(null);
+          setLiffAuthError("การเข้าสู่ระบบ LINE หมดอายุ กรุณาเข้าสู่ระบบใหม่อีกครั้ง");
           throw new Error("การเข้าสู่ระบบ LINE หมดอายุ กรุณาเข้าสู่ระบบใหม่อีกครั้ง");
         }
         throw new Error(data.error || "ไม่สามารถดึงข้อมูลคิวได้");
@@ -279,11 +350,19 @@ function TrackingContent() {
             </div>
           </div>
 
+          {/* Error Message when LINE Auth fails or token expires */}
+          {(liffAuthError || fetchError) && (
+            <div className="bg-rose-50 border border-rose-200/80 rounded-2xl p-3 text-left text-xs text-rose-800 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <span>{liffAuthError || fetchError}</span>
+            </div>
+          )}
+
           {/* LINE Login Action Button */}
           <div className="pt-1 space-y-3">
             <button
               type="button"
-              disabled={isLoggingInLine || !liffInitialized}
+              disabled={isLoggingInLine || (!liffInitialized && typeof window !== "undefined" && !(window as any).liff)}
               onClick={handleLineLogin}
               className="w-full h-12 inline-flex items-center justify-center gap-2.5 px-6 rounded-2xl text-sm font-bold text-white bg-[#06C755] hover:bg-[#05b34c] shadow-sm hover:shadow transition-all cursor-pointer disabled:opacity-60"
             >

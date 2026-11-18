@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAllBookingsFromSheet } from "@/lib/google-sheets";
 import { isDemoMode, getDemoKPIs } from "@/lib/demo-data";
+import { verifyAdminSessionToken } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,18 @@ export async function GET(req: NextRequest) {
     // Mode 1: Google Sheets Mode
     // ==========================================
     if (bookingStorage === "sheets") {
+      // ตรวจสอบสิทธิ์ Admin: ในโหมด Google Sheets ปฏิเสธ demo_token เด็ดขาด
+      const authCheck = verifyAdminSessionToken(adminSession, true);
+      if (!authCheck.valid) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: authCheck.error || "Unauthorized: กรุณาเข้าสู่ระบบในฐานะผู้ดูแลระบบ",
+          },
+          { status: 401 }
+        );
+      }
+
       try {
         const allBookings = await getAllBookingsFromSheet();
 

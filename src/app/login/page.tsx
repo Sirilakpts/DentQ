@@ -9,19 +9,32 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // ฟอร์มเปล่ารอเชื่อมต่อ Backend / Database
+  // Authenticate via server-side Admin Login API
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setErrorMessage(null);
 
-    // จำลองการล็อกอิน (รอเขียน Logic เชื่อมต่อ Database จริง)
-    setTimeout(() => {
-      setIsLoading(false);
-      // ตัวอย่าง: กำหนด cookie จำลองสำหรับการทดสอบ
-      document.cookie = "admin_session=demo_token; path=/; max-age=86400; SameSite=Lax";
+    try {
+      const res = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "อีเมลหรือรหัสผ่านไม่ถูกต้อง");
+      }
+
       window.location.href = "/admin";
-    }, 600);
+    } catch (err: any) {
+      setErrorMessage(err.message || "เกิดข้อผิดพลาดในการเข้าสู่ระบบ");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -61,6 +74,14 @@ export default function LoginPage() {
               ระบบเข้าสู่ระบบสำหรับเจ้าหน้าที่และทันตแพทย์
             </p>
           </div>
+
+          {/* ข้อความแจ้งเตือนข้อผิดพลาด */}
+          {errorMessage && (
+            <div className="mb-5 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+              <span className="font-bold">⚠️</span>
+              <span>{errorMessage}</span>
+            </div>
+          )}
 
           {/* ฟอร์มเข้าสู่ระบบ */}
           <form onSubmit={handleSubmit} className="space-y-5">
