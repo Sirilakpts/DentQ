@@ -172,9 +172,10 @@ class AsyncMutex {
 const bookingSheetsMutex = new AsyncMutex();
 
 /**
- * ข้อมูลบริการทันตกรรมสำรอง กรณีไม่ได้เชื่อมต่อฐานข้อมูล Prisma ในโหมด Demo
+ * ข้อมูลบริการทันตกรรมมาตรฐาน 5 บริการ (Master Service Catalog)
+ * เชื่อมโยงกับ DEMO_SERVICES เพื่อให้ Frontend และ Backend ใช้ Service ID ชุดเดียวกัน
  */
-const FALLBACK_SERVICES: Record<
+const MASTER_SERVICES_MAP: Record<
   string,
   {
     id: string;
@@ -188,70 +189,34 @@ const FALLBACK_SERVICES: Record<
     icon: string;
     isActive: boolean;
   }
-> = {
-  "srv-scaling-filling": {
-    id: "srv-scaling-filling",
-    nameTh: "ขูดหินปูน / อุดฟัน",
-    nameEn: "Scaling / Filling",
-    durationMinutes: 30,
-    priceMin: 800,
-    priceMax: 1500,
-    priceDisplay: "800 - 1,500 บาท",
-    description: "บริการขูดหินปูนและอุดฟัน",
-    icon: "Sparkles",
-    isActive: true,
-  },
-  "srv-extraction-wisdom": {
-    id: "srv-extraction-wisdom",
-    nameTh: "ถอนฟัน / ผ่าฟันคุด",
-    nameEn: "Extraction / Wisdom Tooth",
-    durationMinutes: 45,
-    priceMin: 1000,
-    priceMax: 3500,
-    priceDisplay: "1,000 - 3,500 บาท",
-    description: "บริการถอนฟันและผ่าฟันคุด",
-    icon: "Activity",
-    isActive: true,
-  },
-  "srv-braces-adjustment": {
-    id: "srv-braces-adjustment",
-    nameTh: "ปรับเครื่องมือจัดฟัน",
-    nameEn: "Braces Adjustment",
-    durationMinutes: 30,
-    priceMin: 500,
-    priceMax: 1000,
-    priceDisplay: "500 - 1,000 บาท",
-    description: "ตรวจและปรับเครื่องมือจัดฟัน",
-    icon: "Smile",
-    isActive: true,
-  },
-  "srv-root-canal": {
-    id: "srv-root-canal",
-    nameTh: "รักษารากฟัน",
-    nameEn: "Root Canal Treatment",
-    durationMinutes: 60,
-    priceMin: 3000,
-    priceMax: 7000,
-    priceDisplay: "3,000 - 7,000 บาท",
-    description: "บริการรักษารากฟัน",
-    icon: "HeartPulse",
-    isActive: true,
-  },
-};
+> = Object.fromEntries(DEMO_SERVICES.map((s) => [s.id, s]));
+
+// เพื่อ backward compatibility กับโค้ดเดิมที่อ้างอิง FALLBACK_SERVICES
+const FALLBACK_SERVICES = MASTER_SERVICES_MAP;
 
 /**
- * ค้นหาข้อมูลบริการทันตกรรมจาก Prisma หรือ Fallback
+ * ค้นหาข้อมูลบริการทันตกรรมจาก Master Catalog หรือ Prisma
  */
 async function resolveService(serviceId: string) {
+  const normalizedId = (serviceId || "").trim();
+  if (!normalizedId) return null;
+
+  // 1. ตรวจสอบใน Master Catalog ก่อนเสมอ
+  if (MASTER_SERVICES_MAP[normalizedId]) {
+    return MASTER_SERVICES_MAP[normalizedId];
+  }
+
+  // 2. หากไม่พบใน Master Catalog ลองค้นหาใน Prisma (กรณีโหมด SQLite มี Custom Services เพิ่มเติม)
   try {
     const service = await prisma.service.findUnique({
-      where: { id: serviceId },
+      where: { id: normalizedId },
     });
     if (service) return service;
   } catch (err) {
-    console.warn("Could not query prisma.service, falling back to static config:", err);
+    // ในโหมด Serverless / Sheets การไม่พบ Prisma เป็นเรื่องปกติ
   }
-  return FALLBACK_SERVICES[serviceId] || null;
+
+  return null;
 }
 
 /**
@@ -610,7 +575,16 @@ export async function POST(req: NextRequest) {
     // ในโหมดสาธิต (Demo Mode): ตอบกลับ Digital Ticket จำลองสถานะ PENDING โดยไม่บันทึกลงฐานข้อมูลจริง
     if (isDemoMode()) {
       const selectedService =
-        DEMO_SERVICES.find((s) => s.id === validated.serviceId) || DEMO_SERVICES[0];
+        DEMO_SERVICES.find((s) => s.id === validated.serviceId);
+      if (!selectedService) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "ไม่พบบริการทันตกรรมที่เลือก กรุณาลองใหม่อีกครั้ง",
+          },
+          { status: 400 }
+        );
+      }
 
       // ตรวจสอบโควตารอบเช้าในระบบสาธิต (จำกัดไม่เกิน 6 ท่าน)
       if (isMorningTime(validated.time)) {
@@ -703,11 +677,14 @@ export async function POST(req: NextRequest) {
         }
 
         // 2. ตรวจสอบว่าช่วงเวลา (Slot) ถูกปิดรับนัดหมายหรือไม่
-        const slotConfig = await prisma.slotConfig
-          .findUnique({
-            where: { id: slotId },
-          })
-          .catch(() => null);
+        let slotConfig = null;
+        if (bookingStorage !== "sheets") {
+          slotConfig = await prisma.slotConfig
+            .findUnique({
+              where: { id: slotId },
+            })
+            .catch(() => null);
+        }
 
         if (slotConfig?.isBlocked) {
           throw new Error(
@@ -863,9 +840,30 @@ export async function POST(req: NextRequest) {
     // ==========================================
     const result = await prisma.$transaction(async (tx) => {
       // 1. ตรวจสอบบริการทันตกรรมที่คนไข้เลือก
-      const selectedService = await tx.service.findUnique({
+      let selectedService = await tx.service.findUnique({
         where: { id: validated.serviceId },
       });
+
+      // หากใน SQLite DB ยังไม่มีบริการจาก Master Catalog ให้ upsert ลงใน DB เพื่อรักษา Foreign Key relation
+      if (!selectedService && MASTER_SERVICES_MAP[validated.serviceId]) {
+        const fb = MASTER_SERVICES_MAP[validated.serviceId];
+        selectedService = await tx.service.upsert({
+          where: { id: fb.id },
+          update: {},
+          create: {
+            id: fb.id,
+            nameTh: fb.nameTh,
+            nameEn: fb.nameEn,
+            durationMinutes: fb.durationMinutes,
+            priceMin: fb.priceMin,
+            priceMax: fb.priceMax,
+            priceDisplay: fb.priceDisplay,
+            description: fb.description,
+            icon: fb.icon,
+            isActive: fb.isActive,
+          },
+        });
+      }
 
       if (!selectedService) {
         throw new Error("ไม่พบบริการทันตกรรมที่เลือก กรุณาลองใหม่อีกครั้ง");

@@ -31,6 +31,18 @@ async function main() {
       isActive: true,
     },
     {
+      id: "srv-checkup-consult",
+      nameTh: "ตรวจสุขภาพช่องปากและฟัน",
+      nameEn: "Dental Checkup & Consultation",
+      durationMinutes: 30,
+      priceMin: 300,
+      priceMax: 500,
+      priceDisplay: "300 - 500 บาท",
+      description: "ตรวจเช็กสภาพฟัน เหงือก และช่องปากเบื้องต้น พร้อมให้คำปรึกษาการวางแผนการรักษา",
+      icon: "ShieldCheck",
+      isActive: true,
+    },
+    {
       id: "srv-braces-adjustment",
       nameTh: "ปรับเครื่องมือจัดฟัน",
       nameEn: "Braces Adjustment & Wire Change",
