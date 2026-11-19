@@ -20,27 +20,115 @@ export const THAI_DAYS = [
   "อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"
 ];
 
+/**
+ * แปลงและปรับรูปแบบวันที่ให้เป็น YYYY-MM-DD ตามมาตรฐานของระบบ
+ * รองรับทั้ง:
+ * 1. Google Sheets Date Serial Number (เช่น 46346 หรือ "46346") -> "2026-11-20"
+ * 2. ค่าสตริงเดิมที่เป็น YYYY-MM-DD (เช่น "2026-11-20") -> "2026-11-20" (ไม่แปลงซ้ำ)
+ * 3. ค่า ISO string (เช่น "2026-11-20T00:00:00.000Z") -> "2026-11-20"
+ * 4. ค่าปี พ.ศ. (เช่น "2569-11-20") -> "2026-11-20"
+ * ใช้วิธีคำนวณปฏิทิน UTC บริสุทธิ์ ป้องกันวันเลื่อนจาก Timezone Offset
+ */
+export function normalizeDate(val: any): string {
+  if (val === null || val === undefined || val === "") return "";
+  const str = String(val).trim();
+
+  // 1. ตรวจสอบรูปแบบ YYYY-MM-DD มาตรฐานเดิม
+  const ymdMatch = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (ymdMatch) {
+    let year = parseInt(ymdMatch[1], 10);
+    // ปรับปี พ.ศ. ให้เป็น ค.ศ.
+    if (year > 2400) {
+      year -= 543;
+    }
+    const month = ymdMatch[2].padStart(2, "0");
+    const day = ymdMatch[3].padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  // 2. ตรวจสอบรูปแบบ Google Sheets / Excel Date Serial Number (เช่น 46346)
+  // ช่วง serial 20000 - 100000 ครอบคลุม ค.ศ. 1954 ถึง 2173
+  const num = Number(str);
+  if (!isNaN(num) && num > 20000 && num < 100000) {
+    const wholeDays = Math.floor(num);
+    // ฐานวันของ Excel/Google Sheets คือ 30 ธันวาคม 1899 UTC
+    const utcDate = new Date(Date.UTC(1899, 11, 30) + wholeDays * 86400000);
+    const y = utcDate.getUTCFullYear();
+    const m = String(utcDate.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(utcDate.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  return str;
+}
+
+/**
+ * แปลงและปรับรูปแบบเวลาให้เป็น HH:mm ตามมาตรฐานของระบบ
+ * รองรับทั้ง:
+ * 1. Google Sheets Time Fraction (เช่น 0.4166666667 หรือ "0.4166666667") -> "10:00"
+ * 2. ค่าสตริงเดิมที่เป็น HH:mm (เช่น "10:00", "09:30") -> "10:00" (ไม่แปลงซ้ำ)
+ * 3. ค่าเวลาหลักเดียว (เช่น "9:00", "9:30") -> "09:00", "09:30"
+ * 4. ค่าเวลาที่มีวินาที (เช่น "10:00:00") -> "10:00"
+ */
+export function normalizeTime(val: any): string {
+  if (val === null || val === undefined || val === "") return "";
+  const str = String(val).trim();
+
+  // 1. ตรวจสอบรูปแบบ HH:mm มาตรฐานเดิม
+  if (/^\d{2}:\d{2}$/.test(str)) {
+    return str;
+  }
+
+  // 2. ตรวจสอบรูปแบบ H:mm (เติม 0 นำหน้า เช่น "9:00" -> "09:00")
+  if (/^\d:\d{2}$/.test(str)) {
+    return `0${str}`;
+  }
+
+  // 3. ตรวจสอบรูปแบบ HH:mm:ss หรือ H:mm:ss (ตัดเฉพาะ HH:mm)
+  const hmsMatch = str.match(/^(\d{1,2}):(\d{2}):\d{2}$/);
+  if (hmsMatch) {
+    return `${hmsMatch[1].padStart(2, "0")}:${hmsMatch[2]}`;
+  }
+
+  // 4. ตรวจสอบ Google Sheets Time Fraction (เช่น 0.4166666667 หรือ float)
+  const num = Number(str);
+  if (!isNaN(num)) {
+    // เอาเฉพาะส่วนทศนิยมที่เป็นเศษส่วนของวัน 24 ชั่วโมง
+    const fraction = num >= 1 ? num % 1 : num;
+    if (fraction > 0.0001 && fraction < 0.9999) {
+      const totalSeconds = Math.round(fraction * 86400);
+      const hours = Math.floor(totalSeconds / 3600) % 24;
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+    }
+  }
+
+  return str;
+}
+
 // Format date to Thai Buddhist Era (พ.ศ.)
 export function formatThaiDate(dateStr: string, options: { short?: boolean; includeDay?: boolean } = {}): string {
   try {
-    const parts = dateStr.split("-");
-    if (parts.length !== 3) return dateStr;
+    const cleanDate = normalizeDate(dateStr);
+    const parts = cleanDate.split("-");
+    if (parts.length !== 3) return String(dateStr);
     const year = parseInt(parts[0], 10);
     const month = parseInt(parts[1], 10) - 1;
     const day = parseInt(parts[2], 10);
     
-    const d = new Date(year, month, day);
+    // สร้าง Date ใน UTC เพื่อป้องกัน timezone shift
+    const d = new Date(Date.UTC(year, month, day));
     const buddhistYear = year + 543;
     const monthName = options.short ? THAI_MONTHS_SHORT[month] : THAI_MONTHS[month];
     
     if (options.includeDay) {
-      const dayName = THAI_DAYS[d.getDay()];
+      const dayName = THAI_DAYS[d.getUTCDay()];
       return `วัน${dayName}ที่ ${day} ${monthName} ${buddhistYear}`;
     }
     
     return `${day} ${monthName} ${buddhistYear}`;
   } catch {
-    return dateStr;
+    return String(dateStr);
   }
 }
 

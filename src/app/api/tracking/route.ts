@@ -4,6 +4,7 @@ import { findBookingsByLineUserIdFromSheet } from "@/lib/google-sheets";
 import { verifyLineIdToken } from "@/lib/lineApi";
 import { isDemoMode, getDemoBookings } from "@/lib/demo-data";
 import { isUatUserAllowlisted } from "@/lib/auth";
+import { normalizeDate, normalizeTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -151,13 +152,15 @@ export async function GET(req: NextRequest) {
         });
 
         const bookings = matchedRecords.map((r) => {
-          const hour = parseInt(r.bookingTime.split(":")[0], 10);
+          const normDate = normalizeDate(r.bookingDate);
+          const normTime = normalizeTime(r.bookingTime);
+          const hour = parseInt(normTime.split(":")[0], 10);
           const period = !isNaN(hour) && hour < 12 ? "MORNING" : "AFTERNOON";
           return {
             id: r.bookingId,
             queueNumber: r.bookingId,
-            date: r.bookingDate,
-            time: r.bookingTime,
+            date: normDate,
+            time: normTime,
             period,
             serviceId: "",
             patientName: r.patientName,

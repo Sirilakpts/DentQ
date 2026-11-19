@@ -24,7 +24,7 @@ import {
   User,
   HeartPulse,
 } from "lucide-react";
-import { formatThaiDate, maskPhoneNumber } from "@/lib/utils";
+import { formatThaiDate, maskPhoneNumber, normalizeTime } from "@/lib/utils";
 import { BookingRecord, BookingStatus } from "@/lib/types";
 import { DEMO_MOCK_USER } from "@/lib/demo-data";
 import { getLiffId, getLiffRedirectUri, getSafeLiffProfile } from "@/lib/liff";
@@ -728,9 +728,9 @@ function TrackingContent() {
                     <div className="p-3 bg-slate-50 rounded-xl space-y-1">
                       <span className="text-slate-400 font-medium">วันและเวลานัดหมาย</span>
                       <p className="font-bold text-slate-900 text-sm">
-                        {formatThaiDate(b.date, { short: true })}
+                        {formatThaiDate(b.date)}
                       </p>
-                      <p className="text-[11px] text-[#063466] font-bold">{b.time} น.</p>
+                      <p className="text-[11px] text-[#063466] font-bold">{normalizeTime(b.time)} น.</p>
                     </div>
 
                     <div className="p-3 bg-slate-50 rounded-xl space-y-1">

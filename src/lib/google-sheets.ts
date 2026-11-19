@@ -1,5 +1,5 @@
 import { google } from "googleapis";
-import { countActiveMorningBookings } from "./utils";
+import { countActiveMorningBookings, normalizeDate, normalizeTime } from "./utils";
 import { isDemoMode } from "./demo-data";
 
 export interface SheetBookingData {
@@ -179,13 +179,11 @@ export function parseRow(row: any[], rowIndex: number): SheetBookingRecord {
   const colA = String(row[0] ?? "").trim();
   const colB = String(row[1] ?? "").trim();
   const colC = String(row[2] ?? "").trim();
-  const colD = String(row[3] ?? "").trim();
-
-  // ปรับรูปแบบเวลาให้เป็น HH:mm เสมอ (เช่น "9:00" -> "09:00")
-  let colE = String(row[4] ?? "").trim();
-  if (/^\d:\d{2}$/.test(colE)) {
-    colE = `0${colE}`;
-  }
+  
+  // ปรับรูปแบบวันและเวลาให้เป็นไปตามมาตรฐานระบบ (YYYY-MM-DD และ HH:mm)
+  // รองรับทั้ง Google Sheets Date Serial (เช่น 46346) และ Time Fraction (เช่น 0.4166666667)
+  const colD = normalizeDate(row[3]);
+  const colE = normalizeTime(row[4]);
 
   const colF = String(row[5] ?? "").trim().toUpperCase();
   const colG = String(row[6] ?? "").trim();
@@ -355,6 +353,8 @@ export async function getAllBookingsFromSheet(): Promise<SheetBookingRecord[]> {
       response = await sheets.spreadsheets.values.get({
         spreadsheetId,
         range: "Bookings!A2:M",
+        valueRenderOption: "FORMATTED_VALUE",
+        dateTimeRenderOption: "FORMATTED_STRING",
       });
     } catch (rangeErr: any) {
       const msg = String(rangeErr?.message || "");
@@ -366,6 +366,8 @@ export async function getAllBookingsFromSheet(): Promise<SheetBookingRecord[]> {
         response = await sheets.spreadsheets.values.get({
           spreadsheetId,
           range: "A2:M",
+          valueRenderOption: "FORMATTED_VALUE",
+          dateTimeRenderOption: "FORMATTED_STRING",
         });
       } else {
         throw rangeErr;
