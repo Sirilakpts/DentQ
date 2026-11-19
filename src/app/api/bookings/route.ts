@@ -178,7 +178,7 @@ const bookingSheetsMutex = new AsyncMutex();
  */
 const bookingRateLimitMap = new Map<string, number[]>();
 
-export function checkBookingRateLimit(
+function checkBookingRateLimit(
   userId: string,
   options?: { bypassTest?: boolean }
 ): { allowed: boolean; error?: string } {
