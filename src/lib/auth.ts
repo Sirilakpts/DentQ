@@ -125,30 +125,41 @@ export function verifyAdminSessionToken(
 /**
  * ตรวจสอบว่าบัญชี LINE User ID ได้รับอนุญาตให้เข้าถึงระบบ UAT หรือไม่
  * ในโหมด UAT (เมื่อเชื่อมต่อ Google Sheets และไม่ใช่ Demo Mode):
- * บังคับให้เฉพาะ LINE User ID ที่ระบุใน UAT_LINE_ALLOWLIST หรือ LINE_NOTIF_ALLOWLIST เท่านั้น
+ * บังคับให้เฉพาะ LINE User ID ที่ระบุใน UAT_LINE_ALLOWLIST เท่านั้น
  * ที่สามารถสร้างการจองคิว ดูข้อมูล หรือจัดการคิวได้
  * เพื่อป้องกันบุคคลภายนอกสร้างการจองหรือเข้าถึงข้อมูล UAT
+ *
+ * ข้อกำหนดความปลอดภัย:
+ * - LINE_NOTIF_ALLOWLIST ใช้ควบคุมผู้รับการแจ้งเตือนเท่านั้น ห้ามใช้แทนสิทธิ์จองคิว
+ * - รองรับหลายบัญชี คั่นด้วย comma ตัดช่องว่าง และกรองค่าที่ไม่ถูกต้องออก
+ * - ห้าม Hardcode บัญชีผู้ใช้ในโค้ด
  */
 export function isUatUserAllowlisted(lineUserId?: string | null): boolean {
   if (!lineUserId || !lineUserId.trim()) return false;
 
-  const allowlistEnv =
-    process.env.UAT_LINE_ALLOWLIST || process.env.LINE_NOTIF_ALLOWLIST;
+  const cleanUserId = lineUserId.trim();
 
-  // หากไม่มีการกำหนด Allowlist: ปลอดภัยไว้ก่อนโดยปฏิเสธการเข้าถึง UAT ทั้งหมด
-  if (!allowlistEnv || !allowlistEnv.trim()) {
+  // อ่านเฉพาะ UAT_LINE_ALLOWLIST เท่านั้น (ห้ามใช้ LINE_NOTIF_ALLOWLIST แทนสิทธิ์จองคิว)
+  const rawEnv = (process.env.UAT_LINE_ALLOWLIST || "")
+    .replace(/^["']|["']$/g, "")
+    .trim();
+
+  // หากไม่มีการกำหนด Allowlist: ปลอดภัยไว้ก่อนโดยปฏิเสธการเข้าถึง UAT ทั้งหมด (Fail-Safe)
+  if (!rawEnv) {
     return false;
   }
 
   // หากระบุเป็น "*" จึงจะอนุญาตทุกบัญชี
-  if (allowlistEnv.trim() === "*") {
+  if (rawEnv === "*") {
     return true;
   }
 
-  const allowedList = allowlistEnv
+  // แยกด้วย comma, ตัดช่องว่าง, ตัดเครื่องหมายคำพูด, ปฏิเสธค่าที่ไม่ถูกต้อง
+  const allowedList = rawEnv
     .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
+    .map((s) => s.replace(/^["']|["']$/g, "").trim())
+    .filter((s) => s.length > 0 && !/\s/.test(s))
+    .map((s) => s.toLowerCase());
 
-  return allowedList.includes(lineUserId.trim().toLowerCase());
+  return allowedList.includes(cleanUserId.toLowerCase());
 }

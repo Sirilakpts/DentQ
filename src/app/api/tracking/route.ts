@@ -111,7 +111,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json(
           {
             success: false,
-            error: "ขออภัย ระบบเปิดให้ตรวจสอบคิวเฉพาะบัญชีผู้ทดสอบที่ได้รับอนุญาตเท่านั้น (UAT Restricted)",
+            error: "บัญชี LINE นี้ยังไม่ได้รับสิทธิ์ทดสอบการจองคิว",
             bookings: [],
           },
           { status: 403 }

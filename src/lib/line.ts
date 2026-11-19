@@ -832,34 +832,38 @@ export function buildAdvanceReminderFlexMessage(booking: {
 
 /**
  * ตรวจสอบว่า recipient (LINE User ID) อยู่ใน Allowlist สำหรับการส่งข้อความจริงหรือไม่
- * ในโหมด UAT/ทดสอบ: บังคับส่งเฉพาะบัญชีที่ระบุใน LINE_NOTIF_ALLOWLIST หรือ UAT_LINE_ALLOWLIST
+ * ในโหมด UAT/ทดสอบ: บังคับส่งเฉพาะบัญชีที่ระบุใน LINE_NOTIF_ALLOWLIST เท่านั้น
  * เพื่อป้องกันการส่งข้อความรบกวนประชาชนหรือผู้ป่วยจริงโดยไม่ตั้งใจ
  */
 export function isLineRecipientAllowlisted(recipient: string): boolean {
   if (!recipient || !recipient.trim()) return false;
-  if (recipient.startsWith("08") || recipient.startsWith("09") || recipient.startsWith("U_demo_")) {
+  const cleanRecipient = recipient.trim();
+  if (cleanRecipient.startsWith("08") || cleanRecipient.startsWith("09") || cleanRecipient.startsWith("U_demo_")) {
     return false;
   }
 
-  const allowlistEnv =
-    process.env.LINE_NOTIF_ALLOWLIST || process.env.UAT_LINE_ALLOWLIST;
+  // LINE_NOTIF_ALLOWLIST ใช้ควบคุมผู้รับการแจ้งเตือนเท่านั้น
+  const rawEnv = (process.env.LINE_NOTIF_ALLOWLIST || "")
+    .replace(/^["']|["']$/g, "")
+    .trim();
 
   // หากไม่มีการกำหนด Allowlist ในสิ่งแวดล้อม: Fail-Safe บล็อกการส่งข้อความจริงทั้งหมด
-  if (!allowlistEnv || !allowlistEnv.trim()) {
+  if (!rawEnv) {
     return false;
   }
 
   // หากระบุเป็น "*" จึงจะอนุญาตทุกบัญชี
-  if (allowlistEnv.trim() === "*") {
+  if (rawEnv === "*") {
     return true;
   }
 
-  const allowed = allowlistEnv
+  const allowed = rawEnv
     .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
+    .map((s) => s.replace(/^["']|["']$/g, "").trim())
+    .filter((s) => s.length > 0 && !/\s/.test(s))
+    .map((s) => s.toLowerCase());
 
-  return allowed.includes(recipient.trim().toLowerCase());
+  return allowed.includes(cleanRecipient.toLowerCase());
 }
 
 /**

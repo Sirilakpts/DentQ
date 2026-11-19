@@ -662,7 +662,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           {
             success: false,
-            error: "ขออภัย ระบบเปิดรับการจองคิวเฉพาะบัญชีผู้ทดสอบที่ได้รับอนุญาตเท่านั้น (UAT Restricted)",
+            error: "บัญชี LINE นี้ยังไม่ได้รับสิทธิ์ทดสอบการจองคิว",
           },
           { status: 403 }
         );
