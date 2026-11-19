@@ -9,7 +9,8 @@ import {
   ShieldAlert, 
   LayoutDashboard, 
   MessageSquare,
-  ArrowLeft
+  ArrowLeft,
+  Lock
 } from "lucide-react";
 
 export default function Navbar() {
@@ -38,97 +39,111 @@ export default function Navbar() {
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-1.5">
-          {isAdmin ? (
-            // ==========================================
-            // แอดมิน: แสดงแดชบอร์ด, แทรกคิวฉุกเฉิน, LINE Flex
-            // ==========================================
-            <>
-              <Link
-                href="/"
-                className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors mr-1"
-                title="ไปยังหน้าเว็บไซต์คนไข้"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>หน้าหลักคนไข้</span>
-              </Link>
+        <div className="hidden md:flex items-center gap-2">
+          <nav className="flex items-center gap-1.5">
+            {isAdmin ? (
+              // ==========================================
+              // แอดมิน: แสดงแดชบอร์ด, แทรกคิวฉุกเฉิน, LINE Flex
+              // ==========================================
+              <>
+                <Link
+                  href="/"
+                  className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors mr-1"
+                  title="ไปยังหน้าเว็บไซต์คนไข้"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>หน้าหลักคนไข้</span>
+                </Link>
 
-              <Link
-                href="/admin/emergency"
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-rose-700 bg-rose-50 hover:bg-rose-100 transition-colors border border-rose-200"
-              >
-                <ShieldAlert className="w-4 h-4 text-rose-600 animate-pulse" />
-                <span className="font-semibold">แทรกคิวฉุกเฉิน</span>
-              </Link>
+                <Link
+                  href="/admin/emergency"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-rose-700 bg-rose-50 hover:bg-rose-100 transition-colors border border-rose-200"
+                >
+                  <ShieldAlert className="w-4 h-4 text-rose-600 animate-pulse" />
+                  <span className="font-semibold">แทรกคิวฉุกเฉิน</span>
+                </Link>
 
-              <div className="h-5 w-px bg-slate-200 mx-1" />
+                <div className="h-5 w-px bg-slate-200 mx-1" />
 
-              <Link
-                href="/admin"
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold transition-all ${
-                  pathname === "/admin"
-                    ? "text-white bg-[#063466] hover:bg-[#05264b] shadow-sm"
-                    : "text-slate-700 hover:text-[#063466] hover:bg-slate-50"
-                }`}
-              >
-                <LayoutDashboard className="w-4 h-4" />
-                <span>แดชบอร์ดเจ้าหน้าที่</span>
-              </Link>
+                <Link
+                  href="/admin"
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    pathname === "/admin"
+                      ? "text-white bg-[#063466] hover:bg-[#05264b] shadow-sm"
+                      : "text-slate-700 hover:text-[#063466] hover:bg-slate-50"
+                  }`}
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span>แดชบอร์ดเจ้าหน้าที่</span>
+                </Link>
 
-              <Link
-                href="/admin/line-preview"
-                className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
-                title="จำลอง LINE Flex Message"
-              >
-                <MessageSquare className="w-4 h-4 text-emerald-600" />
-                <span className="hidden xl:inline">LINE Flex</span>
-              </Link>
-            </>
-          ) : (
-            // ==========================================
-            // ประชาชนทั่วไป: แสดงเฉพาะ "หน้าหลัก", "จองคิว", "ตรวจสอบคิว"
-            // ซ่อนเมนูของระบบหลังบ้านทั้งหมด
-            // ==========================================
-            <>
-              <Link
-                href="/"
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  pathname === "/"
-                    ? "bg-[#eef3f9] text-[#063466] font-bold border border-[#063466]/15"
-                    : "text-slate-700 hover:text-[#063466] hover:bg-slate-50"
-                }`}
-              >
-                <span>หน้าหลัก</span>
-              </Link>
+                <Link
+                  href="/admin/line-preview"
+                  className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                  title="จำลอง LINE Flex Message"
+                >
+                  <MessageSquare className="w-4 h-4 text-emerald-600" />
+                  <span className="hidden xl:inline">LINE Flex</span>
+                </Link>
+              </>
+            ) : (
+              // ==========================================
+              // ประชาชนทั่วไป: แสดงเฉพาะ "หน้าหลัก", "จองคิว", "ตรวจสอบคิว"
+              // ซ่อนเมนูของระบบหลังบ้านทั้งหมด
+              // ==========================================
+              <>
+                <Link
+                  href="/"
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    pathname === "/"
+                      ? "bg-[#eef3f9] text-[#063466] font-bold border border-[#063466]/15"
+                      : "text-slate-700 hover:text-[#063466] hover:bg-slate-50"
+                  }`}
+                >
+                  <span>หน้าหลัก</span>
+                </Link>
 
-              <Link
-                href="/book"
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  pathname === "/book"
-                    ? "bg-[#eef3f9] text-[#063466] font-bold border border-[#063466]/15"
-                    : "text-slate-700 hover:text-[#063466] hover:bg-slate-50"
-                }`}
-              >
-                <Calendar className="w-4 h-4 text-[#063466]" />
-                <span>จองคิวตรวจฟัน</span>
-              </Link>
+                <Link
+                  href="/book"
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    pathname === "/book"
+                      ? "bg-[#eef3f9] text-[#063466] font-bold border border-[#063466]/15"
+                      : "text-slate-700 hover:text-[#063466] hover:bg-slate-50"
+                  }`}
+                >
+                  <Calendar className="w-4 h-4 text-[#063466]" />
+                  <span>จองคิวตรวจฟัน</span>
+                </Link>
 
-              <Link
-                href="/tracking"
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  pathname === "/tracking"
-                    ? "bg-[#eef3f9] text-[#063466] font-bold border border-[#063466]/15"
-                    : "text-slate-700 hover:text-[#063466] hover:bg-slate-50"
-                }`}
-              >
-                <Search className="w-4 h-4 text-[#063466]" />
-                <span>ตรวจสอบคิว</span>
-              </Link>
-            </>
+                <Link
+                  href="/tracking"
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    pathname === "/tracking"
+                      ? "bg-[#eef3f9] text-[#063466] font-bold border border-[#063466]/15"
+                      : "text-slate-700 hover:text-[#063466] hover:bg-slate-50"
+                  }`}
+                >
+                  <Search className="w-4 h-4 text-[#063466]" />
+                  <span>ตรวจสอบคิว</span>
+                </Link>
+              </>
+            )}
+          </nav>
+
+          {/* ปุ่มสำหรับเจ้าหน้าที่ (แสดงเฉพาะหน้าแรก Header ขวาสุด เรียบง่าย ไม่เด่นกว่าปุ่มหลัก) */}
+          {pathname === "/" && (
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[#063466] bg-white hover:bg-slate-50 border border-slate-200 hover:border-[#063466]/30 transition-all shadow-2xs ml-1"
+              title="เข้าสู่ระบบสำหรับเจ้าหน้าที่และทันตแพทย์"
+            >
+              <Lock className="w-3.5 h-3.5 text-[#063466]" />
+              <span>สำหรับเจ้าหน้าที่</span>
+            </Link>
           )}
-        </nav>
+        </div>
 
-        {/* Mobile Header Action */}
+        {/* Mobile Header Action (คงเมนูประชาชนเดิมครบถ้วน 100%: เช็กคิว และ จองคิว) */}
         <div className="flex md:hidden items-center gap-2">
           {isAdmin ? (
             <>
@@ -222,6 +237,20 @@ export default function Navbar() {
           </>
         )}
       </div>
+
+      {/* Mobile Staff Secondary Entry Strip (แสดงเฉพาะหน้าแรก ในตำแหน่งรองเพื่อไม่ให้เบียดปุ่มหลัก) */}
+      {!isAdmin && pathname === "/" && (
+        <div className="md:hidden bg-slate-50/90 border-t border-slate-200/70 px-4 py-1.5 flex justify-end items-center">
+          <Link
+            href="/login"
+            className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-500 hover:text-[#063466] transition-colors"
+            title="เข้าสู่ระบบสำหรับเจ้าหน้าที่"
+          >
+            <Lock className="w-3 h-3 text-[#063466]" />
+            <span>สำหรับเจ้าหน้าที่</span>
+          </Link>
+        </div>
+      )}
     </header>
   );
 }
