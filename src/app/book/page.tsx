@@ -1439,7 +1439,7 @@ export default function BookQueuePage() {
                 <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl text-[11px] text-emerald-800 flex items-center gap-2">
                   <span className="text-base shrink-0">💬</span>
                   <span>
-                    <strong>เชื่อมต่อ LINE สำเร็จ:</strong> ระบบจะส่งข้อความแจ้งเตือนผลการตรวจสอบคิวไปยังบัญชี LINE นี้โดยอัตโนมัติ
+                    <strong>เชื่อมต่อ LINE สำเร็จ:</strong> ระบบจะส่งข้อความแจ้งเตือนผลการตรวจสอบคิวไปยังบัญชี LINE นี้โดยอัตโนมัติ (หากยังไม่เคยเพิ่มเพื่อน กรุณาเพิ่มเพื่อนกับ LINE Official Account ของคลินิกเพื่อรับการแจ้งเตือน)
                   </span>
                 </div>
               )}

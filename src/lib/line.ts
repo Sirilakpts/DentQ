@@ -830,10 +830,22 @@ export function buildAdvanceReminderFlexMessage(booking: {
   };
 }
 
+export interface SendNotificationResult {
+  success: boolean;
+  status: string;
+  reason?: string;
+  error?: any;
+  logId?: string | null;
+}
+
 /**
  * ตรวจสอบว่า recipient (LINE User ID) อยู่ใน Allowlist สำหรับการส่งข้อความจริงหรือไม่
  * ในโหมด UAT/ทดสอบ: บังคับส่งเฉพาะบัญชีที่ระบุใน LINE_NOTIF_ALLOWLIST เท่านั้น
  * เพื่อป้องกันการส่งข้อความรบกวนประชาชนหรือผู้ป่วยจริงโดยไม่ตั้งใจ
+ *
+ * การรองรับ LINE_NOTIF_ALLOWLIST=*:
+ * - อนุญาตเฉพาะ Vercel Preview branch uat หรือสภาพแวดล้อม Development/Test เท่านั้น
+ * - มี Server-side Guard บล็อกห้ามใช้ wildcard '*' ใน Production โดยเด็ดขาด
  */
 export function isLineRecipientAllowlisted(recipient: string): boolean {
   if (!recipient || !recipient.trim()) return false;
@@ -852,8 +864,30 @@ export function isLineRecipientAllowlisted(recipient: string): boolean {
     return false;
   }
 
-  // หากระบุเป็น "*" จึงจะอนุญาตทุกบัญชี
+  // หากระบุเป็น "*" จึงจะอนุญาตทุกบัญชี (เฉพาะ Preview Branch uat / Development เท่านั้น บล็อก Production เด็ดขาด)
   if (rawEnv === "*") {
+    const vercelEnv = (process.env.VERCEL_ENV || "").trim().toLowerCase();
+    const nodeEnv = (process.env.NODE_ENV || "").trim().toLowerCase();
+
+    // Guard 1: บล็อก Production เด็ดขาด ไม่ว่ากรณีใดก็ตาม
+    if (vercelEnv === "production" || (nodeEnv === "production" && !vercelEnv)) {
+      console.warn("[LINE Safe Guard] Wildcard '*' notification allowlist is strictly blocked in production.");
+      return false;
+    }
+
+    // Guard 2: หากรันบน Vercel ต้องเป็น Preview และ Branch uat เท่านั้น
+    if (vercelEnv) {
+      if (vercelEnv !== "preview") {
+        console.warn(`[LINE Safe Guard] Wildcard '*' is only permitted in preview environment, got: ${vercelEnv}`);
+        return false;
+      }
+      const gitBranch = (process.env.VERCEL_GIT_COMMIT_REF || "").trim().toLowerCase();
+      if (gitBranch && gitBranch !== "uat") {
+        console.warn(`[LINE Safe Guard] Wildcard '*' is only permitted on branch 'uat', got: ${gitBranch}`);
+        return false;
+      }
+    }
+
     return true;
   }
 
@@ -877,9 +911,11 @@ export async function sendLineFlexNotification(params: {
   recipient: string;
   flexMessage: LineFlexMessage;
   skipDbLog?: boolean;
-}) {
+}): Promise<SendNotificationResult> {
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
   let status = "SIMULATED";
+  let failureReason: string | undefined;
+  let apiError: any = null;
 
   const isAllowlisted = isLineRecipientAllowlisted(params.recipient);
 
@@ -888,7 +924,12 @@ export async function sendLineFlexNotification(params: {
       `[LINE Safe Guard] Recipient '${params.recipient}' is not in LINE_NOTIF_ALLOWLIST. Message push simulated.`
     );
     status = "SIMULATED_NOT_IN_ALLOWLIST";
-  } else if (token && params.recipient && !params.recipient.startsWith("08") && !params.recipient.startsWith("09")) {
+    failureReason = "Recipient not in LINE_NOTIF_ALLOWLIST";
+  } else if (!token) {
+    console.log("[LINE Safe Guard] LINE_CHANNEL_ACCESS_TOKEN not configured. Message push simulated.");
+    status = "SIMULATED_NO_TOKEN";
+    failureReason = "LINE_CHANNEL_ACCESS_TOKEN not configured";
+  } else if (params.recipient && !params.recipient.startsWith("08") && !params.recipient.startsWith("09")) {
     try {
       const res = await fetch("https://api.line.me/v2/bot/message/push", {
         method: "POST",
@@ -906,12 +947,15 @@ export async function sendLineFlexNotification(params: {
         status = "SUCCESS";
       } else {
         const errorData = await res.json().catch(() => ({}));
-        console.warn("LINE Messaging API responded with error:", errorData);
+        console.warn(`[LINE Messaging API] Push failed with HTTP ${res.status}:`, errorData);
         status = "FAILED";
+        apiError = errorData;
+        failureReason = errorData?.message || `LINE Messaging API returned HTTP ${res.status}`;
       }
-    } catch (err) {
-      console.warn("Error sending LINE message:", err);
+    } catch (err: any) {
+      console.warn("[LINE Messaging API] Network error sending LINE message:", err?.message || err);
       status = "FAILED";
+      failureReason = err?.message || "Network error";
     }
   }
 
@@ -921,6 +965,8 @@ export async function sendLineFlexNotification(params: {
     return {
       success: status === "SUCCESS",
       status,
+      reason: failureReason,
+      error: apiError,
       logId: null,
     };
   }
@@ -936,9 +982,20 @@ export async function sendLineFlexNotification(params: {
         status: status,
       },
     });
-    return { success: true, status, logId: log.id };
+    return {
+      success: status === "SUCCESS",
+      status,
+      reason: failureReason,
+      error: apiError,
+      logId: log.id,
+    };
   } catch (err) {
     console.error("Failed to save NotificationLog:", err);
-    return { success: false, status: "ERROR" };
+    return {
+      success: false,
+      status: "ERROR",
+      reason: err instanceof Error ? err.message : "Failed to save NotificationLog",
+      error: err,
+    };
   }
 }
