@@ -123,14 +123,57 @@ export function verifyAdminSessionToken(
 }
 
 /**
+ * ตรวจสอบเงื่อนไขความปลอดภัยว่าระบบได้รับอนุญาตให้เปิดรับการจองแบบสาธารณะในโหมด UAT หรือไม่
+ * ต้องผ่านเงื่อนไขครบทั้ง 6 ข้ออย่างเคร่งครัด:
+ * 1. UAT_OPEN_BOOKING === "true"
+ * 2. VERCEL_ENV === "preview" (ห้ามเปิดใน production เด็ดขาด)
+ * 3. VERCEL_GIT_COMMIT_REF === "uat" (ต้องเป็น Branch uat ที่ยืนยันได้)
+ * 4. DEMO_MODE === "false"
+ * 5. BOOKING_STORAGE === "sheets"
+ * 6. มี GOOGLE_SHEETS_UAT_SPREADSHEET_ID (ชี้ไปยัง Google Sheets สำหรับ UAT โดยเฉพาะ)
+ */
+export function isUatOpenBookingEnabled(): boolean {
+  // 1. UAT_OPEN_BOOKING ต้องเป็น true
+  const isOpen = (process.env.UAT_OPEN_BOOKING || "").trim().toLowerCase() === "true";
+  if (!isOpen) return false;
+
+  // 2. VERCEL_ENV ต้องเป็น preview เท่านั้น (ห้ามเปิดใน production เด็ดขาด)
+  const vercelEnv = (process.env.VERCEL_ENV || "").trim().toLowerCase();
+  if (vercelEnv !== "preview") return false;
+
+  // 3. อยู่ใน Branch uat ที่ยืนยันได้
+  const gitBranch = (process.env.VERCEL_GIT_COMMIT_REF || "").trim().toLowerCase();
+  if (gitBranch !== "uat") return false;
+
+  // 4. DEMO_MODE ต้องเป็น false
+  const demoMode = (process.env.DEMO_MODE || "").trim().toLowerCase();
+  if (demoMode !== "false") return false;
+
+  // 5. BOOKING_STORAGE ต้องเป็น sheets
+  const bookingStorage = (process.env.BOOKING_STORAGE || "").trim().toLowerCase();
+  if (bookingStorage !== "sheets") return false;
+
+  // 6. มี GOOGLE_SHEETS_UAT_SPREADSHEET_ID ชี้ไปยังชีต UAT
+  const uatSheetId = (process.env.GOOGLE_SHEETS_UAT_SPREADSHEET_ID || "").trim();
+  if (!uatSheetId) return false;
+
+  return true;
+}
+
+/**
  * ตรวจสอบว่าบัญชี LINE User ID ได้รับอนุญาตให้เข้าถึงระบบ UAT หรือไม่
  * ในโหมด UAT (เมื่อเชื่อมต่อ Google Sheets และไม่ใช่ Demo Mode):
  * บังคับให้เฉพาะ LINE User ID ที่ระบุใน UAT_LINE_ALLOWLIST เท่านั้น
  * ที่สามารถสร้างการจองคิว ดูข้อมูล หรือจัดการคิวได้
  * เพื่อป้องกันบุคคลภายนอกสร้างการจองหรือเข้าถึงข้อมูล UAT
  *
+ * ข้อยกเว้นความปลอดภัย (UAT Open Booking Mode):
+ * หากผ่านเงื่อนไข Server-side isUatOpenBookingEnabled() ครบทั้ง 6 ข้อ
+ * จะอนุญาตให้ทุกบัญชี LINE ที่ยืนยันตัวตนสำเร็จทดสอบจองคิวได้ โดยไม่ต้องใส่ User ID ใน Allowlist ทีละคน
+ *
  * ข้อกำหนดความปลอดภัย:
  * - LINE_NOTIF_ALLOWLIST ใช้ควบคุมผู้รับการแจ้งเตือนเท่านั้น ห้ามใช้แทนสิทธิ์จองคิว
+ * - หากเงื่อนไข UAT Open Booking ไม่ครบ ให้กลับไปใช้ UAT_LINE_ALLOWLIST เดิมทันที (Fail-Safe)
  * - รองรับหลายบัญชี คั่นด้วย comma ตัดช่องว่าง และกรองค่าที่ไม่ถูกต้องออก
  * - ห้าม Hardcode บัญชีผู้ใช้ในโค้ด
  */
@@ -139,6 +182,12 @@ export function isUatUserAllowlisted(lineUserId?: string | null): boolean {
 
   const cleanUserId = lineUserId.trim();
 
+  // 1. หากผ่านเงื่อนไข Server-side UAT Open Booking ครบถ้วน อนุญาตให้ทุกบัญชี LINE ที่ผ่านการยืนยันตัวตน
+  if (isUatOpenBookingEnabled()) {
+    return true;
+  }
+
+  // 2. หากเงื่อนไขไม่ครบ: ใช้ UAT_LINE_ALLOWLIST เดิมตามปกติ ห้ามข้ามการตรวจสิทธิ์อัตโนมัติ
   // อ่านเฉพาะ UAT_LINE_ALLOWLIST เท่านั้น (ห้ามใช้ LINE_NOTIF_ALLOWLIST แทนสิทธิ์จองคิว)
   const rawEnv = (process.env.UAT_LINE_ALLOWLIST || "")
     .replace(/^["']|["']$/g, "")

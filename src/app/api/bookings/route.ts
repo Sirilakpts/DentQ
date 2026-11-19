@@ -172,6 +172,64 @@ class AsyncMutex {
 const bookingSheetsMutex = new AsyncMutex();
 
 /**
+ * In-memory sliding-window rate limiter สำหรับ Serverless Node.js
+ * จำกัดความถี่ในการสร้างการจองคิวต่อ verified LINE User ID
+ * ป้องกันการกดปุ่มย้ำ (Rapid double-click) และการยิง API ซ้ำบน Serverless
+ */
+const bookingRateLimitMap = new Map<string, number[]>();
+
+export function checkBookingRateLimit(
+  userId: string,
+  options?: { bypassTest?: boolean }
+): { allowed: boolean; error?: string } {
+  // ข้ามการจำกัดใน unit test เว้นแต่จะระบุให้ทดสอบจริง
+  if (process.env.NODE_ENV === "test" && !options?.bypassTest) {
+    return { allowed: true };
+  }
+
+  const now = Date.now();
+  const windowMs = 60 * 1000; // 1 นาที
+  const maxRequestsPerWindow = 5; // สูงสุด 5 ครั้งต่อนาทีต่อผู้ใช้
+  const minIntervalMs = 5000; // Cooldown 5 วินาทีระหว่างคำขอ
+
+  const timestamps = (bookingRateLimitMap.get(userId) || []).filter(
+    (t) => now - t < windowMs
+  );
+
+  const lastAttempt = timestamps[timestamps.length - 1];
+  if (lastAttempt && now - lastAttempt < minIntervalMs) {
+    return {
+      allowed: false,
+      error: "กรุณารอสักครู่ (5 วินาที) ก่อนทำรายการจองอีกครั้ง เพื่อป้องกันการส่งคำขอซ้ำ",
+    };
+  }
+
+  if (timestamps.length >= maxRequestsPerWindow) {
+    return {
+      allowed: false,
+      error: "มีการส่งคำขอจองคิวถี่เกินไป กรุณารอ 1 นาทีแล้วลองใหม่อีกครั้ง",
+    };
+  }
+
+  timestamps.push(now);
+  bookingRateLimitMap.set(userId, timestamps);
+
+  // ป้องกัน Memory leak หากมีผู้ใช้จำนวนมาก
+  if (bookingRateLimitMap.size > 500) {
+    bookingRateLimitMap.forEach((times, key) => {
+      const active = times.filter((t: number) => now - t < windowMs);
+      if (active.length === 0) {
+        bookingRateLimitMap.delete(key);
+      } else {
+        bookingRateLimitMap.set(key, active);
+      }
+    });
+  }
+
+  return { allowed: true };
+}
+
+/**
  * ข้อมูลบริการทันตกรรมมาตรฐาน 5 บริการ (Master Service Catalog)
  * เชื่อมโยงกับ DEMO_SERVICES เพื่อให้ Frontend และ Backend ใช้ Service ID ชุดเดียวกัน
  */
@@ -569,6 +627,18 @@ export async function POST(req: NextRequest) {
     console.log(
       `[Booking API] LINE ID Token verified successfully for user: ${verifiedLineUserId}`
     );
+
+    // ตรวจสอบ Rate Limiting ฝั่ง Serverless ป้องกันการส่งคำขอซ้ำหรือ Burst requests
+    const rateLimitCheck = checkBookingRateLimit(verifiedLineUserId);
+    if (!rateLimitCheck.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: rateLimitCheck.error,
+        },
+        { status: 429 }
+      );
+    }
 
     const slotId = `${validated.date}_${validated.time}`;
 
