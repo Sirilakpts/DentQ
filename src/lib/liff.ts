@@ -61,3 +61,68 @@ export function getLiffRedirectUri(subPath: string = "/book"): string {
   // Local development fallback
   return `${window.location.origin}${cleanPath}`;
 }
+
+/**
+ * ดึงข้อมูลโปรไฟล์ LINE อย่างปลอดภัย (Safe Profile Resolution)
+ * 1. พยายามเรียก liff.getProfile() เพื่อดึงโปรไฟล์จาก LINE SDK
+ * 2. หากเกิด Error (เช่น "The permission is not in LIFF app scope.")
+ *    จะ Fallback ไปถอดรหัสจาก ID Token (liff.getDecodedIDToken()) ซึ่งต้องการเพียงสิทธิ์ openid
+ * 3. ไม่เปิดเผย Token หรือข้อมูลลับลง Log (Zero-Leakage)
+ */
+export async function getSafeLiffProfile(liff: any): Promise<{
+  userId: string;
+  displayName: string;
+  pictureUrl?: string;
+} | null> {
+  if (!liff) return null;
+
+  try {
+    const profile = await liff.getProfile();
+    if (profile && (profile.userId || profile.displayName)) {
+      return {
+        userId: profile.userId,
+        displayName: profile.displayName || "ผู้ใช้ LINE",
+        pictureUrl: profile.pictureUrl || undefined,
+      };
+    }
+  } catch (err: any) {
+    const errMsg = (err?.message || "").toLowerCase();
+    const isPermissionError =
+      errMsg.includes("permission") ||
+      errMsg.includes("scope") ||
+      errMsg.includes("not in liff app scope");
+
+    // Fallback เฉพาะกรณีเกิด Permission / Scope Error เท่านั้น และไม่กลบข้อผิดพลาดประเภทอื่น
+    if (isPermissionError) {
+      console.warn(
+        "[LIFF SafeProfile] Permission error in liff.getProfile(), falling back to ID token claims:",
+        err?.message || "Scope restriction"
+      );
+    } else {
+      // ข้อผิดพลาดอื่น (เช่น Network Error หรือ Fatal SDK Error) จะไม่ถูกกลบ และโยนต่อให้ caller จัดการตามปกติ
+      console.error("[LIFF SafeProfile] Non-permission error in liff.getProfile():", err?.message || err);
+      throw err;
+    }
+  }
+
+  try {
+    if (typeof liff.getDecodedIDToken === "function") {
+      const decoded = liff.getDecodedIDToken();
+      if (decoded && (decoded.sub || decoded.userId)) {
+        return {
+          userId: decoded.sub || decoded.userId,
+          displayName: decoded.name || "ผู้ใช้ LINE",
+          pictureUrl: decoded.picture || undefined,
+        };
+      }
+    }
+  } catch (decodeErr: any) {
+    console.warn(
+      "[LIFF SafeProfile] Failed to decode ID token claims:",
+      decodeErr?.message || "Decode error"
+    );
+  }
+
+  return null;
+}
+

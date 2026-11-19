@@ -31,7 +31,7 @@ import confetti from "canvas-confetti";
 import { formatThaiDate, getBookableDateRange } from "@/lib/utils";
 import { DentalService, SlotAvailability } from "@/lib/types";
 import { DEMO_MOCK_USER, DEMO_SERVICES } from "@/lib/demo-data";
-import { getLiffId, getLiffRedirectUri } from "@/lib/liff";
+import { getLiffId, getLiffRedirectUri, getSafeLiffProfile } from "@/lib/liff";
 
 // สิทธิการรักษา 5 แบบตามมาตรฐานระบบทันตกรรม DentQ
 const MEDICAL_RIGHTS_OPTIONS = [
@@ -150,9 +150,16 @@ export default function BookQueuePage() {
         const idToken = liff.getIDToken();
         if (idToken) {
           setLineIdToken(idToken);
-          const profile = await liff.getProfile();
-          setLineProfile(profile);
-          setLiffAuthError(null);
+          // ดึงโปรไฟล์อย่างปลอดภัย (หุ้ม liff.getProfile() พร้อม fallback ไปยัง getDecodedIDToken())
+          // รองรับ process.env.NEXT_PUBLIC_LIFF_ID และป้องกันข้อผิดพลาด Scope Permission
+          const profile = await getSafeLiffProfile(liff);
+          if (profile) {
+            setLineProfile(profile);
+            setLiffAuthError(null);
+          } else {
+            setLineProfile(null);
+            setLiffAuthError("ไม่สามารถดึงข้อมูลบัญชี LINE ได้ กรุณากดเข้าสู่ระบบใหม่อีกครั้ง");
+          }
         } else {
           // มี session เก่าแต่ Token หมดอายุหรือไม่ได้รับ openid scope
           setLineIdToken(null);
@@ -164,7 +171,7 @@ export default function BookQueuePage() {
       console.warn("[LIFF Init Error]:", err);
       setLiffInitialized(false);
       setLiffAuthError(
-        "ไม่สามารถเชื่อมต่อกับระบบ LINE ได้ (LIFF ID หรือ Endpoint อาจไม่ตรงกับที่ลงทะเบียนใน LINE Developers) ท่านสามารถกดลองใหม่ หรือใช้บัญชีจำลองเพื่อทดสอบได้ทันที"
+        "ไม่สามารถเชื่อมต่อกับระบบ LINE ได้ (LIFF ID หรือ Endpoint อาจไม่ตรงกับที่ลงทะเบียนใน LINE Console) ท่านสามารถกดลองใหม่ หรือใช้บัญชีจำลองเพื่อทดสอบได้ทันที"
       );
     }
   };
@@ -215,16 +222,18 @@ export default function BookQueuePage() {
           const idToken = liff.getIDToken();
           if (idToken) {
             setLineIdToken(idToken);
-            const profile = await liff.getProfile();
-            setLineProfile(profile);
-            clearTimeout(safetyTimer);
-            setIsLoggingInLine(false);
-            return;
+            const profile = await getSafeLiffProfile(liff);
+            if (profile) {
+              setLineProfile(profile);
+              clearTimeout(safetyTimer);
+              setIsLoggingInLine(false);
+              return;
+            }
           }
         }
       }
 
-      // กรณี External Browser: สร้าง redirectUri ที่ตรงกับ Endpoint ที่ลงทะเบียนใน LINE Developers เสมอ
+      // กรณี External Browser: สร้าง redirectUri ที่ตรงกับ Endpoint ที่ลงทะเบียนใน LINE Console เสมอ
       const redirectUri = getLiffRedirectUri("/book");
 
       if (!liff.isLoggedIn()) {
@@ -237,12 +246,12 @@ export default function BookQueuePage() {
           liff.login({ redirectUri });
         } else {
           setLineIdToken(idToken);
-          try {
-            const profile = await liff.getProfile();
+          const profile = await getSafeLiffProfile(liff);
+          if (profile) {
             setLineProfile(profile);
             clearTimeout(safetyTimer);
             setIsLoggingInLine(false);
-          } catch (profileErr) {
+          } else {
             liff.logout();
             liff.login({ redirectUri });
           }
